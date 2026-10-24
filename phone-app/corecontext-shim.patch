@@ -13,7 +13,7 @@ index 6427d78..6fe9bba 100644
  				case .Cleared:
  					Log.info("[CoreContext][onAccountRegistrationStateChanged] Account \(account.displayName()) registration was cleared.")
  				case .Failed:
-@@ -735,6 +739,121 @@ enum AppServices {
+@@ -735,6 +739,122 @@ enum AppServices {
  	static var corePreferences = CorePreferences(config: config)
  }
  
@@ -113,6 +113,7 @@ index 6427d78..6fe9bba 100644
 +			if code == 200 {
 +				Log.info("[PushShimReporter] voip token registered for \(username)")
 +				UserDefaults.standard.set(dedupeKey, forKey: lastReportedKey)
++				retryAttempts.removeValue(forKey: username)
 +			} else {
 +				Log.error("[PushShimReporter] shim returned HTTP \(code) for \(username)")
 +			}
