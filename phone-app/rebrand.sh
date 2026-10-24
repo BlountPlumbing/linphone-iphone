@@ -151,8 +151,18 @@ find "$ROOT" -name AppIntentVocabulary.plist -exec perl -pi -e 's/\bLinphone\b/B
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ICON_DST="$ROOT/Linphone/Assets.xcassets/AppIcon.appiconset/1024x1024.png"
 if [ -f "$SCRIPT_DIR/AppIcon-1024.png" ] && [ -d "$(dirname "$ICON_DST")" ]; then
+	# Guard the exact rejection TestFlight hit: PNG color-type byte 6 = RGBA
+	# (has alpha). Byte offset 25 in the PNG header. Only 0 (gray) or 2 (RGB)
+	# are acceptable for an opaque App Store icon.
+	ct="$(od -An -j25 -N1 -tu1 "$SCRIPT_DIR/AppIcon-1024.png" | tr -d ' ')"
+	if [ "$ct" != "2" ] && [ "$ct" != "0" ]; then
+		echo "FATAL: AppIcon-1024.png has alpha (PNG color type $ct) —" \
+			"TestFlight rejects alpha icons. Regenerate via make-icon.py" \
+			"(emits opaque RGB) or flatten." >&2
+		exit 1
+	fi
 	cp "$SCRIPT_DIR/AppIcon-1024.png" "$ICON_DST"
-	echo "== app icon replaced from phone-app/AppIcon-1024.png =="
+	echo "== app icon replaced from phone-app/AppIcon-1024.png (opaque, ct=$ct) =="
 fi
 
 # --- 7. verify pass — fail loudly on leftovers --------------------------------

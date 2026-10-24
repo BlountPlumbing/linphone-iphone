@@ -38,6 +38,11 @@ J
 Expected keys: `apns_voip_token`, `apns_call_topic=net.blount.phone.voip`,
 `apns_default_topic=net.blount.phone`.
 
+> Quirk: inside the guest, `wazo-auth-cli token create` output disappears in
+> `$( )`/redirection (shell quirk, observed 2026-10-24) — capture it from
+> Python (`subprocess.check_output`) like pbx-push-shim.py does, or use a
+> saved token file. `use_sandbox=False` + cert/key verified live.
+
 ## Ring matrix (call vector: `15547` → office branch → ext900x)
 
 | State | Expected |

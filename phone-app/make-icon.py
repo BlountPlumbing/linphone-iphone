@@ -7,8 +7,10 @@ handset-receiver silhouette — rotated -35 deg. Supersampled 4x, LANCZOS
 downscale. Output: phone-app/AppIcon-1024.png
 
 Replaces Linphone/Assets.xcassets/AppIcon.appiconset/1024x1024.png at
-fork-build time (manual leftover per PREP-NOTES.md).
+fork-build time (rebrand.sh step 6b). Output MUST be opaque RGB — TestFlight
+rejects any alpha channel in the app icon.
 """
+import os
 from PIL import Image, ImageDraw, ImageFont
 
 S = 4
@@ -47,7 +49,11 @@ gl = gl.rotate(-35, resample=Image.BICUBIC, center=(SIZE // 2, SIZE // 2))
 img = Image.alpha_composite(img, gl)
 
 img = img.resize((1024, 1024), Image.LANCZOS)
-img.save("/home/nick/Windows/blount-platform/phone-app/AppIcon-1024.png")
+# Flatten to opaque RGB — transparent rounded corners would reintroduce the
+# alpha channel TestFlight rejected (build-1 upload failure).
+img = Image.alpha_composite(Image.new("RGBA", img.size, NAVY + (255,)), img)
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "AppIcon-1024.png")
+img.convert("RGB").save(out)
 prev = Image.new("RGBA", (256, 256), NAVY + (255,))
 prev.alpha_composite(img.resize((256, 256), Image.LANCZOS))
 prev.convert("RGB").save("/tmp/appicon-preview.png")

@@ -87,7 +87,7 @@ The patch anchors on `Linphone/Core/CoreContext.swift` `onAccountRegistrationSta
 
 ## Manual leftovers (NOT scripted — deliberate)
 
-- `Linphone/Assets.xcassets/AppIcon.appiconset/1024x1024.png` — replace icon binary at design time.
+- ~~`Linphone/Assets.xcassets/AppIcon.appiconset/1024x1024.png`~~ — NOW SCRIPTED: `make-icon.py` renders + `rebrand.sh` step 6b drops an opaque RGB Blount icon (TestFlight rejects alpha).
 - `illus-belledonne` image assets + "Linphone" strings in Localizable.strings/welcome flows — cosmetic, later pass.
 - `sip.linphone.org` default domain / `linphone-iphone@belledonne-communications.com` log-email — upstream defaults kept (harmless; can revisit).
 - `linphone-*` URL schemes — internal deep links (`linphone-message://` used by `LinphoneApp.swift:321`, remote provisioning uses `linphone-config://`) — kept.
@@ -97,4 +97,4 @@ The patch anchors on `Linphone/Core/CoreContext.swift` `onAccountRegistrationSta
 
 App IDs to register (all with Push Notifications; app also needs app-group + keychain-sharing):
 `net.blount.phone`, `net.blount.phone.msgNotificationService`, `net.blount.phone.linphoneExtension`, `net.blount.phone.intentsExtension`.
-App group: `group.net.blount.phone`. 4 provisioning profiles (app-store or ad-hoc method per TestFlight need).
+App group: `group.net.blount.phone`. 4 provisioning profiles — RESOLVED app-store method: `BlountDist <bundle-id>` minted via ASC API under dist cert `LY27K966XJ`; b64 blobs live in fork secrets `PROV_PROFILE_*` (CI manual export-signing).
