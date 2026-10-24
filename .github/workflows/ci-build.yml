@@ -1,0 +1,178 @@
+# ci-build.yml — GitHub Actions build for Blount Phone (branded linphone-iphone 6.2 fork)
+#
+# LAYOUT ASSUMPTION: this file runs from the FORK repo where the linphone-iphone
+# release/6.2 tree is the checkout root and phone-app/ sits alongside it:
+#     <repo>/LinphoneApp.xcodeproj
+#     <repo>/Linphone/...
+#     <repo>/phone-app/{rebrand.sh, corecontext-shim.patch, ...}
+# If the fork vendors the source in a subdir instead, set LINPHONE_DIR to it.
+#
+# JOBS:
+#   build-unsigned  — WORKS NOW, no A4 dependency. Rebrand + patch + SPM resolve +
+#                     `xcodebuild build CODE_SIGNING_ALLOWED=NO`. Proves the fork
+#                     compiles on every push.
+#   archive-signed  — BLOCKED ON A4 (VoIP Services cert + App IDs/profiles or an
+#                     App Store Connect API key). Produces a signed .xcarchive +
+#                     .ipa artifact. Gate: repo variable A4_SIGNING_READY=true
+#                     flips it on (see the `if:` on the job).
+#
+# SECRETS (repo Settings > Secrets > Actions):
+#   PBX_SHIM_TOKEN              — shared secret with pbx-push-shim.service
+#                                 (/etc/pbx-push-shim.env SHIM_TOKEN on pbx-wazo-01)
+#   APPSTORE_CONNECT_KEY_ID     — ASC API key (role: App Manager / "Certificates,
+#   APPSTORE_CONNECT_ISSUER_ID    Identifiers & Profiles" access) for automatic
+#   APPSTORE_CONNECT_PRIVATE_KEY  signing + TestFlight upload (p8, base64)
+#   ALT: manual signing instead — APPLE_SIGNING_CERT_P12 (base64 .p12 of the
+#   Apple Distribution cert), APPLE_SIGNING_CERT_PASSWORD, and four
+#   PROVISIONING_PROFILE_{APP,MSG,SHARE,INTENTS} base64 .mobileprovision files
+#   (see commented block at the bottom of the archive job).
+
+name: Blount Phone CI
+on:
+  workflow_dispatch:
+  push:
+    branches: [release/6.2-blount]
+
+env:
+  LINPHONE_DIR: .
+  SCHEME: Linphone                     # shared scheme that builds the LinphoneApp target
+  PROJECT: LinphoneApp.xcodeproj
+  TEAM_ID: S77XPPF572
+
+jobs:
+  # ---------------------------------------------------------------- unsigned --
+  build-unsigned:
+    name: Build (unsigned) — rebrand + patch + compile
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 16+
+        run: |
+          # pick the highest-versioned Xcode_*.app (no sort -V on macOS runners)
+          XV=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sed 's|.*/Xcode_||;s|\.app$||' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          XC="/Applications/Xcode_${XV}.app"; [ -d "$XC" ] || XC=/Applications/Xcode.app
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Rebrand to net.blount.phone
+        run: bash "$LINPHONE_DIR/phone-app/rebrand.sh" "$LINPHONE_DIR"
+
+      - name: Apply CoreContext shim patch
+        run: git apply --verbose "$LINPHONE_DIR/phone-app/corecontext-shim.patch"
+
+      - name: Resolve Swift packages (github mirror, pinned 5.5.36)
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$LINPHONE_DIR/$PROJECT" -scheme "$SCHEME"
+
+      - name: Build (no signing)
+        run: |
+          xcodebuild build \
+            -project "$LINPHONE_DIR/$PROJECT" -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath derivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            PBX_SHIM_URL="http://192.168.200.158:8777" \
+            PBX_SHIM_TOKEN=""
+
+  # ------------------------------------------------------------------ signed --
+  archive-signed:
+    name: Archive (signed) — needs A4 cert/profiles + PBX_SHIM_TOKEN
+    runs-on: macos-latest
+    needs: build-unsigned
+    # Flip `A4_SIGNING_READY` repo variable to 'true' once the VoIP Services
+    # cert + ASC API key secrets exist (plan atom A4). Until then the unsigned
+    # job above is the live check.
+    if: ${{ vars.A4_SIGNING_READY == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 16+
+        run: |
+          XV=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sed 's|.*/Xcode_||;s|\.app$||' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          XC="/Applications/Xcode_${XV}.app"; [ -d "$XC" ] || XC=/Applications/Xcode.app
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Rebrand to net.blount.phone
+        run: bash "$LINPHONE_DIR/phone-app/rebrand.sh" "$LINPHONE_DIR"
+
+      - name: Apply CoreContext shim patch
+        run: git apply --verbose "$LINPHONE_DIR/phone-app/corecontext-shim.patch"
+
+      - name: Resolve Swift packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project "$LINPHONE_DIR/$PROJECT" -scheme "$SCHEME"
+
+      - name: Install App Store Connect API key
+        env:
+          ASC_KEY_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$ASC_KEY_B64" | base64 -d > ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8
+          chmod 600 ~/.private_keys/AuthKey_*.p8
+
+      - name: Archive
+        env:
+          PBX_SHIM_TOKEN: ${{ secrets.PBX_SHIM_TOKEN }}
+        run: |
+          xcodebuild archive \
+            -project "$LINPHONE_DIR/$PROJECT" -scheme "$SCHEME" \
+            -configuration Release \
+            -archivePath build/BlountPhone.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}" \
+            -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8 \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PBX_SHIM_URL="http://192.168.200.158:8777" \
+            PBX_SHIM_TOKEN="$PBX_SHIM_TOKEN"
+
+      - name: Export IPA (app-store-connect method → TestFlight)
+        run: |
+          cat > exportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>S77XPPF572</string>
+            <key>uploadSymbols</key><true/>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/BlountPhone.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}" \
+            -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlountPhone-ipa
+          path: build/ipa/*.ipa
+
+      # Optional: straight to TestFlight (internal testers only — skips beta review)
+      # - name: Upload to TestFlight
+      #   run: |
+      #     xcrun altool --upload-app -f build/ipa/*.ipa -t ios \
+      #       --apiKey "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
+      #       --apiIssuer "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}"
+
+# MANUAL-SIGNING ALTERNATIVE (if ASC API key isn't available): import the
+# distribution cert into a temp keychain + drop 4 .mobileprovision files into
+# ~/Library/MobileDevice/Provisioning Profiles/, then archive with
+#   CODE_SIGN_STYLE=Manual
+#   and per-target specifiers via a small xcconfig override file:
+#     PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*] handled per-target —
+# simplest is generating a Profiles.xcconfig that maps each target's profile
+# UUID, or pre-setting profiles in the project. Prefer the ASC-key path; it
+# lets Xcode create/manage the 4 profiles itself once the App IDs exist.

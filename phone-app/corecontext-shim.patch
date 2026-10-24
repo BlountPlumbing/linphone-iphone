@@ -1,0 +1,157 @@
+diff --git a/Linphone/Core/CoreContext.swift b/Linphone/Core/CoreContext.swift
+index 6427d78..6fe9bba 100644
+--- a/Linphone/Core/CoreContext.swift
++++ b/Linphone/Core/CoreContext.swift
+@@ -422,6 +422,10 @@ class CoreContext: ObservableObject {
+ 					if self.mCore.consolidatedPresence !=  ConsolidatedPresence.Online {
+ 						self.updatePresence(core: self.mCore, presence: ConsolidatedPresence.Online)
+ 					}
++
++					// Blount: upload the PushKit voip token to pbx-push-shim so
++					// wazo-webhookd can target this device (see phone-app/).
++					PushShimReporter.reportVoipTokenIfNeeded(core: core, account: account)
+ 				case .Cleared:
+ 					Log.info("[CoreContext][onAccountRegistrationStateChanged] Account \(account.displayName()) registration was cleared.")
+ 				case .Failed:
+@@ -735,6 +739,121 @@ enum AppServices {
+ 	static var corePreferences = CorePreferences(config: config)
+ }
+ 
++// MARK: - Blount PBX push shim (phone-app/corecontext-shim.patch)
++//
++// After a SIP REGISTER succeeds the SDK has stashed the PushKit voip token in
++// PushNotificationConfig (linphonesw exposes .voipToken on both
++// Core.pushNotificationConfig and AccountParams.pushNotificationConfig).
++// We POST it to the pbx-push-shim on pbx-wazo-01, which performs the wazo-auth
++// external/mobile write that materializes the webhookd mobile subscription.
++//
++// Endpoint/token come from the PBX_SHIM_URL / PBX_SHIM_TOKEN build settings —
++// surfaced through Info.plist keys added by this patch and fed by
++// Shared.xcconfig + CI secrets (`xcodebuild PBX_SHIM_TOKEN=...`).
++// No secrets in source.
++
++enum PushShimReporter {
++
++	private static let lastReportedKey = "pbxShim.lastReported"
++	private static var retryAttempts: [String: Int] = [:]
++	private static let maxAttempts = 6
++
++	/// Call on the core queue (e.g. from onAccountRegistrationStateChanged .Ok).
++	static func reportVoipTokenIfNeeded(core: Core, account: Account) {
++		guard let endpoint = endpointURL(), let token = shimToken() else {
++			return // shim not configured — stock behaviour
++		}
++
++		let username = account.params?.identityAddress?.username ?? ""
++		guard !username.isEmpty else {
++			Log.warn("[PushShimReporter] account has no username, cannot map to wazo user")
++			return
++		}
++
++		// voipToken is the raw PushKit token the SDK registered for us. prid is
++		// the "<voip>:voip&<remote>:remote" composite sent as pn-prid — its
++		// first half is the voip token if a wrapper ever leaves voipToken unset.
++		let voipToken = core.pushNotificationConfig?.voipToken
++			?? account.params?.pushNotificationConfig?.voipToken
++			?? account.params?.pushNotificationConfig?.prid?
++				.components(separatedBy: ":voip").first
++				.flatMap({ $0.isEmpty ? nil : $0 })
++
++		guard let voip = voipToken, !voip.isEmpty else {
++			// PushKit credentials may not have been delivered yet — retry a few
++			// times on the core queue, then give up until the next REGISTER.
++			let attempt = (retryAttempts[username] ?? 0) + 1
++			retryAttempts[username] = attempt
++			guard attempt <= maxAttempts else {
++				Log.error("[PushShimReporter] no voip token for \(username) after \(attempt - 1) retries")
++				return
++			}
++			Log.info("[PushShimReporter] voip token not yet delivered for \(username), retry \(attempt)/\(maxAttempts) in 5s")
++			coreQueue.asyncAfter(deadline: .now() + 5) {
++				reportVoipTokenIfNeeded(core: core, account: account)
++			}
++			return
++		}
++
++		let remoteToken = core.pushNotificationConfig?.remoteToken
++			?? account.params?.pushNotificationConfig?.remoteToken
++
++		let dedupeKey = "\(username):\(voip):\(remoteToken ?? "")"
++		if UserDefaults.standard.string(forKey: lastReportedKey) == dedupeKey {
++			return // this token set already uploaded successfully
++		}
++
++		let bundleId = Bundle.main.bundleIdentifier ?? "net.blount.phone"
++		var body: [String: Any] = [
++			"user": username, // extNNNN — shim resolves to wazo uuid via confd
++			"apns_voip_token": voip,
++			"apns_call_topic": bundleId + ".voip",
++			"apns_default_topic": bundleId
++		]
++		if let remote = remoteToken, !remote.isEmpty {
++			body["apns_notification_token"] = remote
++		}
++
++		guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else {
++			Log.error("[PushShimReporter] failed to serialize request body")
++			return
++		}
++
++		var request = URLRequest(url: endpoint.appendingPathComponent("register"))
++		request.httpMethod = "POST"
++		request.setValue(token, forHTTPHeaderField: "X-Shim-Token")
++		request.setValue("application/json", forHTTPHeaderField: "Content-Type")
++		request.httpBody = httpBody
++		request.timeoutInterval = 15
++
++		URLSession.shared.dataTask(with: request) { _, response, error in
++			if let error = error {
++				Log.error("[PushShimReporter] POST \(endpoint.absoluteString) failed: \(error.localizedDescription)")
++				return
++			}
++			let code = (response as? HTTPURLResponse)?.statusCode ?? 0
++			if code == 200 {
++				Log.info("[PushShimReporter] voip token registered for \(username)")
++				UserDefaults.standard.set(dedupeKey, forKey: lastReportedKey)
++			} else {
++				Log.error("[PushShimReporter] shim returned HTTP \(code) for \(username)")
++			}
++		}.resume()
++	}
++
++	private static func endpointURL() -> URL? {
++		guard let s = Bundle.main.object(forInfoDictionaryKey: "PBX_SHIM_URL") as? String,
++			  !s.isEmpty, let url = URL(string: s) else { return nil }
++		return url
++	}
++
++	private static func shimToken() -> String? {
++		guard let s = Bundle.main.object(forInfoDictionaryKey: "PBX_SHIM_TOKEN") as? String,
++			  !s.isEmpty else { return nil }
++		return s
++	}
++}
++
+ // swiftlint:enable line_length
+ // swiftlint:enable cyclomatic_complexity
+ // swiftlint:enable identifier_name
+diff --git a/Linphone/Info.plist b/Linphone/Info.plist
+index 3c76cae..6c34045 100644
+--- a/Linphone/Info.plist
++++ b/Linphone/Info.plist
+@@ -4,6 +4,15 @@
+ <dict>
+ 	<key>APP_GROUP_NAME</key>
+ 	<string>$(APP_GROUP_NAME)</string>
++	<key>PBX_SHIM_URL</key>
++	<string>$(PBX_SHIM_URL)</string>
++	<key>PBX_SHIM_TOKEN</key>
++	<string>$(PBX_SHIM_TOKEN)</string>
++	<key>NSAppTransportSecurity</key>
++	<dict>
++		<key>NSAllowsLocalNetworking</key>
++		<true/>
++	</dict>
+ 	<key>CFBundleURLTypes</key>
+ 	<array>
+ 		<dict>
