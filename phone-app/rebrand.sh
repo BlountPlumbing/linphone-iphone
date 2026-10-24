@@ -68,7 +68,7 @@ perl -0777 -pi -e '
 ed "$XCCONFIG" 's/^APP_GROUP_NAME = .*$/APP_GROUP_NAME = group.net.blount.phone/'
 # PBX_SHIM_URL uses the http:/$()/ idiom because // starts an xcconfig comment.
 if ! grep -q '^PBX_SHIM_URL' "$XCCONFIG"; then
-	printf '\n# Blount Phone — pbx-push-shim endpoint (task A5). Token is injected by\n# CI via `xcodebuild PBX_SHIM_TOKEN=...`; never commit a real token here.\nPBX_SHIM_URL = %s\nPBX_SHIM_TOKEN = \n' \
+	printf '\n// Blount Phone — pbx-push-shim endpoint (task A5). Token is injected by\n// CI via `xcodebuild PBX_SHIM_TOKEN=...`; never commit a real token here.\nPBX_SHIM_URL = %s\nPBX_SHIM_TOKEN = \n' \
 		"$(echo "$SHIM_URL" | sed 's|://|:/$()/|')" >> "$XCCONFIG"
 fi
 
