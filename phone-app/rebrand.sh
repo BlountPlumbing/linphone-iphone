@@ -173,6 +173,12 @@ fi
 if grep -rn 'USE_CRASHLYTICS' "$PBXPROJ" ; then
 	echo "FAIL: USE_CRASHLYTICS still in pbxproj"; FAIL=1
 fi
+if grep -q 'ITSEncryptionExportComplianceCode' "$PBXPROJ" ; then
+	echo "FAIL: Belledonne export-compliance key still in pbxproj"; FAIL=1
+fi
+if grep -q 'INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = YES' "$PBXPROJ" ; then
+	echo "FAIL: NonExemptEncryption still YES"; FAIL=1
+fi
 if grep -rn 'linphone\.android\|com\.linphone\.|org\.linphone\.' "$ROOT" --exclude-dir=.git --include='*.entitlements' --include='*.plist' --include='*.pbxproj' ; then
 	echo "FAIL: foreign-style bundle identifiers above"; FAIL=1
 fi
