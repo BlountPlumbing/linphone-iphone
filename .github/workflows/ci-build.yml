@@ -160,12 +160,14 @@ jobs:
           name: BlountPhone-ipa
           path: build/ipa/*.ipa
 
-      # Optional: straight to TestFlight (internal testers only — skips beta review)
-      # - name: Upload to TestFlight
-      #   run: |
-      #     xcrun altool --upload-app -f build/ipa/*.ipa -t ios \
-      #       --apiKey "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
-      #       --apiIssuer "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}"
+      # Straight to TestFlight — internal testers only, skips beta review.
+      # App record: ASC id 6826540875 "Blount Phone" (net.blount.phone).
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app -f build/ipa/*.ipa -t ios \
+            --apiKey "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
+            --apiIssuer "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}" \
+            --verbose
 
 # MANUAL-SIGNING ALTERNATIVE (if ASC API key isn't available): import the
 # distribution cert into a temp keychain + drop 4 .mobileprovision files into
