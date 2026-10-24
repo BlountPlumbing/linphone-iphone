@@ -117,6 +117,33 @@ jobs:
           echo "$ASC_KEY_B64" | base64 -d > ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8
           chmod 600 ~/.private_keys/AuthKey_*.p8
 
+      # Manual signing: the team has no registered devices, so automatic
+      # development-profile resolution can't work. Import the Apple
+      # Distribution p12 into a temp keychain + install the 4 App Store
+      # profiles (created via ASC API, named "BlountDist <bundle-id>").
+      - name: Install signing assets
+        env:
+          DIST_P12: ${{ secrets.DIST_P12 }}
+          PROFILE_MAIN: ${{ secrets.PROFILE_MAIN }}
+          PROFILE_MSG: ${{ secrets.PROFILE_MSG }}
+          PROFILE_EXT: ${{ secrets.PROFILE_EXT }}
+          PROFILE_INTENTS: ${{ secrets.PROFILE_INTENTS }}
+        run: |
+          KEYCHAIN=build.keychain; KCP=ci
+          security create-keychain -p "$KCP" $KEYCHAIN
+          security set-keychain-settings -lut 21600 $KEYCHAIN
+          security unlock-keychain -p "$KCP" $KEYCHAIN
+          echo "$DIST_P12" | base64 -d > dist.p12
+          security import dist.p12 -k $KEYCHAIN -P "${{ secrets.DIST_P12_PASSWORD }}" \
+            -T /usr/bin/codesign -T /usr/bin/security && rm dist.p12
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCP" $KEYCHAIN
+          security list-keychains -d user -s $KEYCHAIN $(security list-keychains -d user | tr -d '"')
+          PP=~/Library/MobileDevice/Provisioning\ Profiles; mkdir -p "$PP"
+          for v in PROFILE_MAIN PROFILE_MSG PROFILE_EXT PROFILE_INTENTS; do
+            echo "${!v}" | base64 -d > "$PP/$v.mobileprovision"
+          done
+          ls "$PP" | wc -l
+
       - name: Archive
         env:
           PBX_SHIM_TOKEN: ${{ secrets.PBX_SHIM_TOKEN }}
@@ -143,7 +170,13 @@ jobs:
             <key>method</key><string>app-store-connect</string>
             <key>teamID</key><string>S77XPPF572</string>
             <key>uploadSymbols</key><true/>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict>
+              <key>net.blount.phone</key><string>BlountDist net.blount.phone</string>
+              <key>net.blount.phone.msgNotificationService</key><string>BlountDist net.blount.phone.msgNotificationService</string>
+              <key>net.blount.phone.linphoneExtension</key><string>BlountDist net.blount.phone.linphoneExtension</string>
+              <key>net.blount.phone.intentsExtension</key><string>BlountDist net.blount.phone.intentsExtension</string>
+            </dict>
           </dict></plist>
           EOF
           xcodebuild -exportArchive \

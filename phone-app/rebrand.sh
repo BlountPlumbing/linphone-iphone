@@ -57,17 +57,30 @@ ed "$PBXPROJ" 's/INFOPLIST_KEY_CFBundleDisplayName = Linphone;/INFOPLIST_KEY_CFB
 ed "$PBXPROJ" 's/^[ \t]*"USE_CRASHLYTICS=1",\n//mg'
 ed "$PBXPROJ" 's/ -DUSE_CRASHLYTICS//g'
 
-# Force Apple Distribution signing on Release configs of the app targets ONLY.
-# Needed because (a) the team may have zero registered devices -> development
-# profile resolution fails, and (b) export to TestFlight wants distribution
-# anyway. Scoped to `name = Release` blocks inside this file's
-# XCBuildConfiguration entries — SPM package targets live in generated
-# projects and are untouched. Idempotent.
+# Manual App Store signing on Release configs of the 4 app targets ONLY.
+# Team has zero registered devices -> automatic development profile
+# resolution fails; automatic style also conflicts with any explicit
+# distribution identity. So: CODE_SIGN_STYLE=Manual + Apple Distribution +
+# per-target "BlountDist <bundle-id>" profile specifiers (profiles are
+# created via ASC API and installed by CI). Non-app Release blocks (test
+# targets) are normalized back to Apple Development. SPM package targets
+# live outside this file and are untouched. Idempotent.
 perl -0777 -pi -e '
-	# normalize any existing CODE_SIGN_IDENTITY inside Release blocks
-	s/(buildSettings = \{[^}]*?CODE_SIGN_IDENTITY = ")[^"]*("[^}]*?\n\t+\};\n\t+name = Release;)/${1}Apple Distribution${2}/g;
-	# inject into Release blocks that have no CODE_SIGN_IDENTITY at all
-	s/(buildSettings = \{(?:(?!CODE_SIGN_IDENTITY)[^}])*?)(\n\t+\};\n\t+name = Release;)/$1\t\t\t\tCODE_SIGN_IDENTITY = "Apple Distribution";$2/g;
+s{(buildSettings = \{\n)(.*?)(\n\t+\};\n\t+name = Release;)}{
+  my ($h,$b,$t)=($1,$2,$3);
+  my $bid = $b =~ /PRODUCT_BUNDLE_IDENTIFIER = (net\.blount\.phone(?:\.[A-Za-z]+)?);/ ? $1 : undef;
+  if ($bid) {
+    $b =~ s/CODE_SIGN_STYLE = \w+;/CODE_SIGN_STYLE = Manual;/
+      or $b .= "\t\t\t\tCODE_SIGN_STYLE = Manual;\n";
+    $b =~ s/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "Apple Distribution";/
+      or $b .= "\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";\n";
+    $b =~ s/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "BlountDist $bid";/
+      or $b .= "\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"BlountDist $bid\";\n";
+  } else {
+    $b =~ s/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "Apple Development";/;
+  }
+  "$h$b$t";
+}gse;
 ' "$PBXPROJ"
 
 # SPM: repoint gitlab -> github mirror; pin BOTH linphone-sdk refs to exactVersion
