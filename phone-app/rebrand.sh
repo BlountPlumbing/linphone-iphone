@@ -113,6 +113,16 @@ find "$ROOT" -name AppIntentVocabulary.plist -exec perl -pi -e 's/\bLinphone\b/B
 	ed "$ROOT/scripts/run-mdm-tests.sh" \
 	   's/\borg\.linphone\.phone\b/net.blount.phone/g; s/group\.org\.linphone\.phone\.[A-Za-z]+/group.net.blount.phone/g'
 
+# --- 6b. app icon (Closes the PREP-NOTES "manual leftover") ------------------
+# If phone-app/AppIcon-1024.png rides next to this script, drop it in as the
+# app icon (upstream slot is a single 1024x1024.png — see Contents.json).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ICON_DST="$ROOT/Linphone/Assets.xcassets/AppIcon.appiconset/1024x1024.png"
+if [ -f "$SCRIPT_DIR/AppIcon-1024.png" ] && [ -d "$(dirname "$ICON_DST")" ]; then
+	cp "$SCRIPT_DIR/AppIcon-1024.png" "$ICON_DST"
+	echo "== app icon replaced from phone-app/AppIcon-1024.png =="
+fi
+
 # --- 7. verify pass — fail loudly on leftovers --------------------------------
 echo "== verify pass =="
 FAIL=0

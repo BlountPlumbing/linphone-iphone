@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Blount Phone — remote-provisioning payload template (release/6.2 fork,
+  bundle net.blount.phone). See phone-app/PROVISIONING.md for the full path.
+
+  FORMAT: despite the .linphonerc name, a remote-provisioning payload MUST be
+  lpconfig XML — liblinphone parses the fetched body with
+  _linphone_config_load_from_xml_string() (liblinphone
+  coreapi/remote_provisioning.c). Filename/extension/Content-Type are not
+  checked by the fetcher. Same schema as the MDM `xmlConfig` payload
+  (verified in-tree: LinphoneAppUITests/MDMChatFeatureUITests.swift).
+
+  PLACEHOLDERS — substituted at render time on a host with kubectl, output
+  scp'd to pbx-wazo-01. NEVER commit or repo-store a rendered file.
+
+    __EXT__       SIP auth username = full "extNNNN" string
+                  (Nick = ext9001, Catherine = ext9002; dialled ext = 900x)
+    __PASSWORD__  SIP auth password for that endpoint
+    __DOMAIN__    SIP domain:port = 192.168.200.158:5061
+    __SELF_URI__  This file's own provisioning URL. Embedding it makes the
+                  core re-fetch on every start, so password rotation /
+                  template changes propagate on next app launch.
+                  (linphone-config:// handler does exactly this — writes
+                  misc/config-uri before restarting; URIHandler.swift:113.)
+
+  Credential source — k8s secret blount-pbx-secrets (ns pbx):
+    kubectl get secret blount-pbx-secrets -n pbx \
+      -o jsonpath='{.data.SIP_EXT9001_USER}'     | base64 -d   # -> __EXT__
+    kubectl get secret blount-pbx-secrets -n pbx \
+      -o jsonpath='{.data.SIP_EXT9001_PASSWORD}' | base64 -d   # -> __PASSWORD__
+-->
+<config xmlns="http://www.linphone.org/xsds/lpconfig.xsd">
+
+  <!-- Signalling TLS (port 5061) is carried by reg_proxy/reg_route below;
+       media must be SDES-SRTP to match the endpoint
+       (provision-softphone.py: transport-tls + media_encryption=sdes32). -->
+  <section name="sip">
+    <entry name="media_encryption" overwrite="true">srtp</entry>
+    <!-- If pbx-wazo-01's SIP TLS cert is self-signed and the first REGISTER
+         fails TLS verification, uncomment (SOFTPHONE-SETUP documents Linphone
+         working against this endpoint — verify before weakening): -->
+    <!-- <entry name="verify_server_certs" overwrite="true">0</entry> -->
+  </section>
+
+  <!-- One account: identity + registrar + outbound proxy all point at
+       pbx-wazo-01, reached over the tailnet subnet route
+       (192.168.200.0/24 -> 192.168.200.158). -->
+  <section name="proxy_0">
+    <entry name="reg_identity" overwrite="true">sip:__EXT__@__DOMAIN__</entry>
+    <entry name="reg_proxy" overwrite="true">&lt;sip:__DOMAIN__;transport=tls&gt;</entry>
+    <entry name="reg_route" overwrite="true">&lt;sip:__DOMAIN__;transport=tls&gt;</entry>
+    <entry name="reg_sendregister" overwrite="true">1</entry>
+    <entry name="publish" overwrite="true">0</entry>
+    <!-- Push: the SDK auto-derives pn-param=S77XPPF572.net.blount.phone.voip&remote
+         and pn-prid=<voipTok>:voip&<remoteTok>:remote from the bundle ID once
+         core.pushNotificationEnabled=true (CoreContext.swift ~line 191).
+         These flags keep both pn-* contact-param sets allowed on this
+         account explicitly (AccountParams.pushNotificationAllowed /
+         .remotePushNotificationAllowed — LinphoneWrapper.swift:8904/9109). -->
+    <entry name="push_notification_allowed" overwrite="true">1</entry>
+    <entry name="remote_push_notification_allowed" overwrite="true">1</entry>
+  </section>
+
+  <!-- Digest auth. Realm "asterisk" = chan_pjsip default (the provisioner
+       sets only auth_type/username/password — no realm override). If a
+       challenge ever arrives with a different realm, the SDK still falls
+       back to matching auth_info by username+domain; an empty value here
+       also acts as a wildcard. To avoid shipping the cleartext password in
+       the payload, replace passwd with:
+         <entry name="ha1" overwrite="true">md5(__EXT__:asterisk:__PASSWORD__)</entry> -->
+  <section name="auth_info_0">
+    <entry name="username" overwrite="true">__EXT__</entry>
+    <entry name="passwd" overwrite="true">__PASSWORD__</entry>
+    <entry name="domain" overwrite="true">__DOMAIN__</entry>
+    <entry name="realm" overwrite="true">asterisk</entry>
+    <entry name="algorithm" overwrite="true">MD5</entry>
+  </section>
+
+  <!-- Self-pointer: re-fetch this payload on every core start. -->
+  <section name="misc">
+    <entry name="config-uri" overwrite="true">__SELF_URI__</entry>
+  </section>
+
+</config>
