@@ -57,6 +57,19 @@ ed "$PBXPROJ" 's/INFOPLIST_KEY_CFBundleDisplayName = Linphone;/INFOPLIST_KEY_CFB
 ed "$PBXPROJ" 's/^[ \t]*"USE_CRASHLYTICS=1",\n//mg'
 ed "$PBXPROJ" 's/ -DUSE_CRASHLYTICS//g'
 
+# Force Apple Distribution signing on Release configs of the app targets ONLY.
+# Needed because (a) the team may have zero registered devices -> development
+# profile resolution fails, and (b) export to TestFlight wants distribution
+# anyway. Scoped to `name = Release` blocks inside this file's
+# XCBuildConfiguration entries — SPM package targets live in generated
+# projects and are untouched. Idempotent.
+perl -0777 -pi -e '
+	# normalize any existing CODE_SIGN_IDENTITY inside Release blocks
+	s/(buildSettings = \{[^}]*?CODE_SIGN_IDENTITY = ")[^"]*("[^}]*?\n\t+\};\n\t+name = Release;)/${1}Apple Distribution${2}/g;
+	# inject into Release blocks that have no CODE_SIGN_IDENTITY at all
+	s/(buildSettings = \{(?:(?!CODE_SIGN_IDENTITY)[^}])*?)(\n\t+\};\n\t+name = Release;)/$1\t\t\t\tCODE_SIGN_IDENTITY = "Apple Distribution";$2/g;
+' "$PBXPROJ"
+
 # SPM: repoint gitlab -> github mirror; pin BOTH linphone-sdk refs to exactVersion
 ed "$PBXPROJ" 's|https://gitlab\.linphone\.org/BC/public/linphone-sdk-swift-ios\.git|https://github.com/BelledonneCommunications/linphone-sdk-swift-ios.git|g'
 # collapse the two linphone-sdk requirement styles onto one exact pin
