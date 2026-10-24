@@ -71,11 +71,11 @@ s{(buildSettings = \{\n)(.*?)(\n\t+\};\n\t+name = Release;)}{
   my $bid = $b =~ /PRODUCT_BUNDLE_IDENTIFIER = (net\.blount\.phone(?:\.[A-Za-z]+)?);/ ? $1 : undef;
   if ($bid) {
     $b =~ s/CODE_SIGN_STYLE = \w+;/CODE_SIGN_STYLE = Manual;/
-      or $b .= "\t\t\t\tCODE_SIGN_STYLE = Manual;\n";
+      or $b .= "\n\t\t\t\tCODE_SIGN_STYLE = Manual;";
     $b =~ s/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "Apple Distribution";/
-      or $b .= "\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";\n";
+      or $b .= "\n\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";";
     $b =~ s/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "BlountDist $bid";/
-      or $b .= "\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"BlountDist $bid\";\n";
+      or $b .= "\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"BlountDist $bid\";";
   } else {
     $b =~ s/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "Apple Development";/;
   }

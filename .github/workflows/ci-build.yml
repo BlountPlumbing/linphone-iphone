@@ -33,6 +33,10 @@ on:
   push:
     branches: [release/6.2-blount]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   LINPHONE_DIR: .
   SCHEME: Linphone                     # shared scheme that builds the LinphoneApp target
@@ -159,6 +163,7 @@ jobs:
             -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8 \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGNING_ALLOWED=NO \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             PBX_SHIM_URL="http://192.168.200.158:8777" \
             PBX_SHIM_TOKEN="$PBX_SHIM_TOKEN"
 
@@ -205,6 +210,13 @@ jobs:
             --apiKey "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
             --apiIssuer "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}" \
             --verbose
+
+      - name: Cleanup signing assets
+        if: always()
+        run: |
+          rm -f dist.p12
+          security delete-keychain build.keychain 2>/dev/null || true
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/PROFILE_{MAIN,MSG,EXT,INTENTS}.mobileprovision
 
 # MANUAL-SIGNING ALTERNATIVE (if ASC API key isn't available): import the
 # distribution cert into a temp keychain + drop 4 .mobileprovision files into
