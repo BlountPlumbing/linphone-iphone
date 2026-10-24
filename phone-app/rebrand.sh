@@ -90,6 +90,12 @@ perl -0777 -pi -e '
 	s/(XCRemoteSwiftPackageReference "linphone-sdk-swift-ios" \*\/ = \{\n\t\t\tisa = XCRemoteSwiftPackageReference;\n\t\t\trepositoryURL = "https:\/\/github\.com\/BelledonneCommunications\/linphone-sdk-swift-ios\.git";\n\t\t\trequirement = \{\n)\t\t\t\t(?:branch = stable;\n\t\t\t\tkind = branch;|kind = upToNextMajorVersion;\n\t\t\t\tminimumVersion = [0-9.]+;)/$1\t\t\t\tkind = exactVersion;\n\t\t\t\tversion = '"$SDK_REV_VERSION"';/g
 ' "$PBXPROJ"
 
+# Export compliance: upstream ships Belledonne's filed compliance doc key +
+# ITSAppUsesNonExemptEncryption=YES. We have no ENC docs — declare exempt-only
+# encryption (standard SIP-TLS/SRTP) so TestFlight upload doesn't reject.
+ed "$PBXPROJ" 's/INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = YES;/INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;/g'
+ed "$PBXPROJ" 's/^[ \t]*INFOPLIST_KEY_ITSEncryptionExportComplianceCode = "[0-9a-fA-F-]+";\n//mg'
+
 # --- 2. Shared.xcconfig -------------------------------------------------------
 ed "$XCCONFIG" 's/^APP_GROUP_NAME = .*$/APP_GROUP_NAME = group.net.blount.phone/'
 # PBX_SHIM_URL uses the http:/$()/ idiom because // starts an xcconfig comment.
