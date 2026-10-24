@@ -117,11 +117,12 @@ find "$ROOT" -name AppIntentVocabulary.plist -exec perl -pi -e 's/\bLinphone\b/B
 echo "== verify pass =="
 FAIL=0
 # org.linphone bundle-id pattern anywhere outside .git (sip.linphone.org / doc
-# URLs / the gitlab path we just rewrote are not org.linphone and won't match)
-if grep -rn 'org\.linphone' "$ROOT" --exclude-dir=.git ; then
+# URLs / the gitlab path we just rewrote are not org.linphone and won't match).
+# phone-app/ excluded — it legitimately documents the OLD identifiers.
+if grep -rn 'org\.linphone' "$ROOT" --exclude-dir=.git --exclude-dir=phone-app ; then
 	echo "FAIL: leftover org.linphone identifiers above"; FAIL=1
 fi
-if grep -rn 'belledonne-communications\.linphone\|Z2V957B3D6' "$ROOT" --exclude-dir=.git --exclude-dir=Documentation ; then
+if grep -rn 'belledonne-communications\.linphone\|Z2V957B3D6' "$ROOT" --exclude-dir=.git --exclude-dir=phone-app --exclude-dir=Documentation ; then
 	echo "FAIL: leftover belledonne group / team id above"; FAIL=1
 fi
 if grep -rn 'gitlab\.linphone\.org' "$PBXPROJ" ; then
