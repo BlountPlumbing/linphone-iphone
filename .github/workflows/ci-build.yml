@@ -60,6 +60,7 @@ jobs:
   # ---------------------------------------------------------------- unsigned --
   build-unsigned:
     name: Build (unsigned) — rebrand + patch + compile
+    if: ${{ github.event_name != 'workflow_dispatch' || (!inputs.upload_verified_build29 && !inputs.verify_uploaded_build29) }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -315,15 +316,23 @@ jobs:
           import jwt
           with open('asc-key.p8', 'rb') as f:
               key = f.read()
-          token = jwt.encode({'iss': os.environ['ASC_ISSUER_ID'], 'iat': int(time.time()), 'exp': int(time.time()) + 300, 'aud': 'appstoreconnect-v1'}, key, algorithm='ES256', headers={'kid': os.environ['ASC_KEY_ID'], 'typ': 'JWT'})
-          query = urllib.parse.urlencode({'filter[app]': '6826540875', 'filter[version]': '29', 'limit': '10'})
-          req = urllib.request.Request('https://api.appstoreconnect.apple.com/v1/builds?' + query, headers={'Authorization': 'Bearer ' + token})
-          with urllib.request.urlopen(req, timeout=30) as response:
-              body = json.load(response)
-          builds = [{'id': b['id'], 'version': b['attributes'].get('version'), 'processingState': b['attributes'].get('processingState'), 'uploadedDate': b['attributes'].get('uploadedDate')} for b in body.get('data', [])]
-          print(json.dumps({'appId': '6826540875', 'builds': builds}, sort_keys=True))
-          if len(builds) != 1:
-              raise SystemExit('Expected exactly one build 29 record')
+          token = jwt.encode({'iss': os.environ['ASC_ISSUER_ID'], 'iat': int(time.time()), 'exp': int(time.time()) + 1200, 'aud': 'appstoreconnect-v1'}, key, algorithm='ES256', headers={'kid': os.environ['ASC_KEY_ID'], 'typ': 'JWT'})
+          query = urllib.parse.urlencode({'filter[app]': '6826540875', 'limit': '100'})
+          for attempt in range(20):
+              req = urllib.request.Request('https://api.appstoreconnect.apple.com/v1/builds?' + query, headers={'Authorization': 'Bearer ' + token})
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  body = json.load(response)
+              all_builds = [{'id': b['id'], 'version': b['attributes'].get('version'), 'processingState': b['attributes'].get('processingState'), 'uploadedDate': b['attributes'].get('uploadedDate')} for b in body.get('data', [])]
+              builds = [b for b in all_builds if b['version'] == '29']
+              if builds:
+                  print(json.dumps({'appId': '6826540875', 'builds': builds}, sort_keys=True))
+                  if len(builds) != 1:
+                      raise SystemExit('Duplicate build 29 records')
+                  break
+              print(f'Build 29 not yet visible (attempt {attempt + 1}); visible versions: {sorted(b["version"] for b in all_builds)}')
+              time.sleep(30)
+          else:
+              raise SystemExit('Build 29 did not appear within the polling window')
           PY
           rm -f asc-key.p8
 
@@ -340,3 +349,4 @@ jobs:
 # simplest is generating a Profiles.xcconfig that maps each target's profile
 # UUID, or pre-setting profiles in the project. Prefer the ASC-key path; it
 # lets Xcode create/manage the 4 profiles itself once the App IDs exist.
+
