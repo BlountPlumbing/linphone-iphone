@@ -66,7 +66,7 @@ ed "$PBXPROJ" 's/ -DUSE_CRASHLYTICS//g'
 # targets) are normalized back to Apple Development. SPM package targets
 # live outside this file and are untouched. Idempotent.
 perl -0777 -pi -e '
-s{(buildSettings = \{\n)(.*?)(\n\t+\};\n\t+name = Release;)}{
+s{(/\* Release \*/ = \{\n\t+isa = XCBuildConfiguration;\n\t+buildSettings = \{\n)(.*?)(\n\t+\};\n\t+name = Release;)}{
   my ($h,$b,$t)=($1,$2,$3);
   my $bid = $b =~ /PRODUCT_BUNDLE_IDENTIFIER = (net\.blount\.phone(?:\.[A-Za-z]+)?);/ ? $1 : undef;
   if ($bid) {
@@ -113,10 +113,16 @@ for ENT in "$ROOT/Linphone/Linphone.entitlements" \
 	ed "$ENT" 's/\$\(AppIdentifierPrefix\)org\.linphone\.phone/\$\(AppIdentifierPrefix\)net.blount.phone/g'
 	ed "$ENT" 's|<key>aps-environment</key>\s*\n\s*<string>[^<]*</string>|<key>aps-environment</key>\n\t<string>'"$APS_ENV"'</string>|g' 2>/dev/null || true
 done
+# These upstream capabilities are absent from the Blount distribution profiles.
+# The notification extension still retains its shared app group and keychain access.
+perl -0777 -pi -e 's|\s*<key>com\.apple\.developer\.usernotifications\.filtering</key>\s*<true/>||g' \
+    "$ROOT/msgNotificationService/msgNotificationService.entitlements"
+perl -0777 -pi -e 's#\s*<key>(?:com\.apple\.security\.app-sandbox|com\.apple\.security\.files\.user-selected\.read-only)</key>\s*<true/>##g; s#\s*<key>com\.apple\.developer\.aps-environment</key>\s*<string>[^<]*</string>##g' \
+    "$ROOT/Linphone/Linphone.entitlements"
 # collapse the now-duplicated app-group array in the main app entitlements
 perl -0777 -pi -e 's|<key>com\.apple\.security\.application-groups</key>\s*\n\t*<array>\s*\n(\t*<string>group\.net\.blount\.phone</string>\s*\n)+(\t*</array>)|<key>com.apple.security.application-groups</key>\n\t<array>\n\t\t<string>group.net.blount.phone</string>\n\t</array>|g' \
 	"$ROOT/Linphone/Linphone.entitlements"
-# aps-environment: both keys (aps-environment + com.apple.developer.aps-environment)
+# Use the distribution profile's production APNs environment.
 perl -0777 -pi -e 's|(<key>(?:com\.apple\.developer\.)?aps-environment</key>\s*\n\s*<string>)[^<]*(</string>)|$1'"$APS_ENV"'$2|g' \
 	"$ROOT/Linphone/Linphone.entitlements"
 

@@ -1,0 +1,61 @@
+name: Blount Phone simulator launch
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [release/6.2-blount]
+
+jobs:
+  launch:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode and simulator
+        run: |
+          XV=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sed 's|.*/Xcode_||;s|\.app$||' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          XC="/Applications/Xcode_${XV}.app"; [ -d "$XC" ] || XC=/Applications/Xcode.app
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+          xcrun simctl list devices available
+          xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for v in d.values() for x in v if "iPhone" in x["name"] and x["state"] == "Shutdown"))' > simulator-id.txt
+          xcrun simctl boot "$(cat simulator-id.txt)"
+          xcrun simctl bootstatus "$(cat simulator-id.txt)" -b
+      - name: Rebrand and apply source patch
+        run: |
+          bash phone-app/rebrand.sh .
+          git apply --verbose phone-app/corecontext-shim.patch
+      - name: Build for iPhone simulator
+        run: |
+          xcodebuild build -project LinphoneApp.xcodeproj -scheme Linphone \
+            -configuration Debug -destination "id=$(cat simulator-id.txt)" \
+            -derivedDataPath derivedData CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- \
+            PBX_SHIM_URL="http://192.168.200.158:8777" PBX_SHIM_TOKEN=""
+      - name: Install, launch, and capture running app
+        run: |
+          APP=derivedData/Build/Products/Debug-iphonesimulator/LinphoneApp.app
+          UDID=$(cat simulator-id.txt)
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl io "$UDID" recordVideo --codec=h264 app-launch.mp4 &
+          VIDEO_PID=$!
+          xcrun simctl launch "$UDID" net.blount.phone | tee launch-result.txt
+          sleep 12
+          APP_PID=$(sed -n 's/.*: \([0-9][0-9]*\)$/\1/p' launch-result.txt)
+          xcrun simctl io "$UDID" screenshot app-running.png
+          xcrun simctl spawn "$UDID" log show --style compact --last 2m --predicate 'process == "LinphoneApp"' > app-system.log || true
+          kill -INT "$VIDEO_PID"
+          wait "$VIDEO_PID" || true
+          test -n "$APP_PID"
+          ps -p "$APP_PID" -o pid=,comm= > process-alive.txt
+          test -s process-alive.txt
+      - name: Save simulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blount-phone-simulator-evidence
+          path: |
+            app-launch.mp4
+            app-running.png
+            launch-result.txt
+            process-alive.txt
+            app-system.log
+            simulator-id.txt
