@@ -36,6 +36,11 @@ on:
         type: boolean
         required: true
         default: false
+      verify_uploaded_build29:
+        description: Read Apple processing state for build 29 without uploading
+        type: boolean
+        required: true
+        default: false
   pull_request:
     branches: [release/6.2-blount]
   push:
@@ -239,6 +244,10 @@ jobs:
         run: |
           rm -f dist.p12
           security delete-keychain build.keychain 2>/dev/null || true
+          if [ -f installed-profiles.txt ]; then
+            while IFS= read -r profile; do rm -f "$profile"; done < installed-profiles.txt
+            rm -f installed-profiles.txt
+          fi
 
   upload-verified-build29:
     name: Upload verified build 29 to App Store Connect
@@ -285,10 +294,42 @@ jobs:
       - name: Remove local API key
         if: always()
         run: rm -f ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8
-          if [ -f installed-profiles.txt ]; then
-            while IFS= read -r profile; do rm -f "$profile"; done < installed-profiles.txt
-            rm -f installed-profiles.txt
-          fi
+
+  verify-uploaded-build29:
+    name: Read Apple processing state for build 29
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_uploaded_build29 == true }}
+    runs-on: macos-latest
+    steps:
+      - name: Query existing app build record
+        env:
+          ASC_KEY_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+        run: |
+          python3 -m venv asc-venv
+          asc-venv/bin/pip -q install PyJWT cryptography
+          printf '%s' "$ASC_KEY_B64" | base64 -d > asc-key.p8
+          chmod 600 asc-key.p8
+          asc-venv/bin/python - <<'PY'
+          import json, os, time, urllib.parse, urllib.request
+          import jwt
+          with open('asc-key.p8', 'rb') as f:
+              key = f.read()
+          token = jwt.encode({'iss': os.environ['ASC_ISSUER_ID'], 'iat': int(time.time()), 'exp': int(time.time()) + 300, 'aud': 'appstoreconnect-v1'}, key, algorithm='ES256', headers={'kid': os.environ['ASC_KEY_ID'], 'typ': 'JWT'})
+          query = urllib.parse.urlencode({'filter[app]': '6826540875', 'filter[version]': '29', 'limit': '10'})
+          req = urllib.request.Request('https://api.appstoreconnect.apple.com/v1/builds?' + query, headers={'Authorization': 'Bearer ' + token})
+          with urllib.request.urlopen(req, timeout=30) as response:
+              body = json.load(response)
+          builds = [{'id': b['id'], 'version': b['attributes'].get('version'), 'processingState': b['attributes'].get('processingState'), 'uploadedDate': b['attributes'].get('uploadedDate')} for b in body.get('data', [])]
+          print(json.dumps({'appId': '6826540875', 'builds': builds}, sort_keys=True))
+          if len(builds) != 1:
+              raise SystemExit('Expected exactly one build 29 record')
+          PY
+          rm -f asc-key.p8
+
+      - name: Remove local API key after failure
+        if: always()
+        run: rm -f asc-key.p8
 
 # MANUAL-SIGNING ALTERNATIVE (if ASC API key isn't available): import the
 # distribution cert into a temp keychain + drop 4 .mobileprovision files into
