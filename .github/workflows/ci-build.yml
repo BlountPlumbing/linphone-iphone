@@ -144,13 +144,17 @@ jobs:
             -T /usr/bin/codesign -T /usr/bin/security && rm dist.p12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCP" $KEYCHAIN
           security list-keychains -d user -s $KEYCHAIN $(security list-keychains -d user | tr -d '"')
-          PP=~/Library/MobileDevice/Provisioning\ Profiles; mkdir -p "$PP"
+          PP=~/Library/Developer/Xcode/UserData/Provisioning\ Profiles
+          PP_LEGACY=~/Library/MobileDevice/Provisioning\ Profiles
+          mkdir -p "$PP" "$PP_LEGACY"
           for v in PROFILE_MAIN PROFILE_MSG PROFILE_EXT PROFILE_INTENTS; do
             tmp=$(mktemp)
             echo "${!v}" | base64 -d > "$tmp"
             uuid=$(security cms -D -i "$tmp" | python3 -c 'import plistlib,sys; print(plistlib.loads(sys.stdin.buffer.read())["UUID"])')
             mv "$tmp" "$PP/$uuid.mobileprovision"
+            cp "$PP/$uuid.mobileprovision" "$PP_LEGACY/$uuid.mobileprovision"
             printf '%s\n' "$PP/$uuid.mobileprovision" >> installed-profiles.txt
+            printf '%s\n' "$PP_LEGACY/$uuid.mobileprovision" >> installed-profiles.txt
           done
           ls "$PP" | wc -l
 
