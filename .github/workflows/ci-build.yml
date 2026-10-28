@@ -115,6 +115,9 @@ jobs:
           xcodebuild -resolvePackageDependencies \
             -project "$LINPHONE_DIR/$PROJECT" -scheme "$SCHEME"
 
+      - name: Verify Release signing settings
+        run: python3 "$LINPHONE_DIR/phone-app/verify-release-signing.py"
+
       - name: Install App Store Connect API key
         env:
           ASC_KEY_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}

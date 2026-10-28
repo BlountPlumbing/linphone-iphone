@@ -66,7 +66,7 @@ ed "$PBXPROJ" 's/ -DUSE_CRASHLYTICS//g'
 # targets) are normalized back to Apple Development. SPM package targets
 # live outside this file and are untouched. Idempotent.
 perl -0777 -pi -e '
-s{(buildSettings = \{\n)(.*?)(\n\t+\};\n\t+name = Release;)}{
+s{(/\* Release \*/ = \{\n\t+isa = XCBuildConfiguration;\n\t+buildSettings = \{\n)(.*?)(\n\t+\};\n\t+name = Release;)}{
   my ($h,$b,$t)=($1,$2,$3);
   my $bid = $b =~ /PRODUCT_BUNDLE_IDENTIFIER = (net\.blount\.phone(?:\.[A-Za-z]+)?);/ ? $1 : undef;
   if ($bid) {
