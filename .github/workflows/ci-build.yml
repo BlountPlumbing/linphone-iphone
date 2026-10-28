@@ -30,6 +30,12 @@
 name: Blount Phone CI
 on:
   workflow_dispatch:
+    inputs:
+      upload_verified_build29:
+        description: Upload the exact verified build 29 artifact from run 40678536170
+        type: boolean
+        required: true
+        default: false
   pull_request:
     branches: [release/6.2-blount]
   push:
@@ -233,6 +239,52 @@ jobs:
         run: |
           rm -f dist.p12
           security delete-keychain build.keychain 2>/dev/null || true
+
+  upload-verified-build29:
+    name: Upload verified build 29 to App Store Connect
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_verified_build29 == true }}
+    runs-on: macos-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Download exact signed artifact from successful PR run
+        uses: actions/download-artifact@v4
+        with:
+          name: BlountPhone-ipa
+          run-id: 40678536170
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: verified-ipa
+
+      - name: Verify exact IPA bytes and build identity
+        run: |
+          test "$(find verified-ipa -maxdepth 1 -name '*.ipa' -type f | wc -l | tr -d ' ')" = 1
+          IPA=$(find verified-ipa -maxdepth 1 -name '*.ipa' -type f | head -1)
+          echo 'a75c60fc6e41edabe53dac5519365b621235d3eae52eeb0b4f10da364604fcfa  '"$IPA" | shasum -a 256 -c -
+          mkdir -p verified-app
+          unzip -q "$IPA" 'Payload/*.app/Info.plist' -d verified-app
+          INFO=$(find verified-app/Payload -maxdepth 2 -name Info.plist -type f | head -1)
+          test "$(plutil -extract CFBundleIdentifier raw -o - "$INFO")" = 'net.blount.phone'
+          test "$(plutil -extract CFBundleVersion raw -o - "$INFO")" = '29'
+
+      - name: Install existing App Store Connect API key
+        env:
+          ASC_KEY_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.private_keys
+          printf '%s' "$ASC_KEY_B64" | base64 -d > ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8
+          chmod 600 ~/.private_keys/AuthKey_*.p8
+
+      - name: Upload build 29
+        run: |
+          IPA=$(find verified-ipa -maxdepth 1 -name '*.ipa' -type f | head -1)
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
+            --apiIssuer "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}"
+
+      - name: Remove local API key
+        if: always()
+        run: rm -f ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8
           if [ -f installed-profiles.txt ]; then
             while IFS= read -r profile; do rm -f "$profile"; done < installed-profiles.txt
             rm -f installed-profiles.txt
