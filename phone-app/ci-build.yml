@@ -146,7 +146,11 @@ jobs:
           security list-keychains -d user -s $KEYCHAIN $(security list-keychains -d user | tr -d '"')
           PP=~/Library/MobileDevice/Provisioning\ Profiles; mkdir -p "$PP"
           for v in PROFILE_MAIN PROFILE_MSG PROFILE_EXT PROFILE_INTENTS; do
-            echo "${!v}" | base64 -d > "$PP/$v.mobileprovision"
+            tmp=$(mktemp)
+            echo "${!v}" | base64 -d > "$tmp"
+            uuid=$(security cms -D -i "$tmp" | python3 -c 'import plistlib,sys; print(plistlib.loads(sys.stdin.buffer.read())["UUID"])')
+            mv "$tmp" "$PP/$uuid.mobileprovision"
+            printf '%s\n' "$PP/$uuid.mobileprovision" >> installed-profiles.txt
           done
           ls "$PP" | wc -l
 
@@ -222,7 +226,10 @@ jobs:
         run: |
           rm -f dist.p12
           security delete-keychain build.keychain 2>/dev/null || true
-          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/PROFILE_{MAIN,MSG,EXT,INTENTS}.mobileprovision
+          if [ -f installed-profiles.txt ]; then
+            while IFS= read -r profile; do rm -f "$profile"; done < installed-profiles.txt
+            rm -f installed-profiles.txt
+          fi
 
 # MANUAL-SIGNING ALTERNATIVE (if ASC API key isn't available): import the
 # distribution cert into a temp keychain + drop 4 .mobileprovision files into
