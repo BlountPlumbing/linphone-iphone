@@ -93,3 +93,25 @@ if tt.exists():
     check('local-return test present', 'testLocalMethodReturnIsNotRemoteConfirmation' in tt_src)
     check('restore tests present', 'testCancelRestoresOriginal' in tt_src and 'testRemoteEndWhilePendingFailsThenRestores' in tt_src)
 print('ok: atoms 4.23-4.27 transfer source+test contracts')
+
+# --- atoms 4.28-4.31: regression tests + marketing/legal source contracts ---
+rg = Path(root / 'LinphoneAppTests' / 'BlountRegressionTests.swift')
+check('regression tests exist', rg.exists())
+if rg.exists():
+    rs = rg.read_text(encoding='utf-8')
+    check('second-call identity tests', 'testTwoCallsGetDistinctPresentations' in rs and 'testCallKitUUIDIsPrimaryKeyWhenPresent' in rs)
+    check('generation guard tests', 'testStaleGenerationCannotSelect' in rs)
+    check('route policy tests', 'testRoutePolicyCollapsesToEarpieceWhenRestricted' in rs)
+# 4.30: no upstream marketing strings in Blount-owned routes
+marketing = ['Linphone is a', ' SIP phone', 'belledonne', 'Belledonne',
+             'open source SIP', 'Download Linphone', 'linphone.org']
+hits = [m for m in marketing if m in all_src]
+check('no upstream marketing strings in Blount dir', not hits)
+# 4.31: license/legal retention — app still ships license surfaces outside Blount dir
+lic = root / 'Linphone'
+lic_src = ''
+for p in lic.rglob('*.swift'):
+    try: lic_src += p.read_text(encoding='utf-8', errors='ignore')
+    except Exception: pass
+check('license/legal surface retained', 'license' in lic_src.lower() or 'License' in lic_src)
+print('ok: atoms 4.28-4.31 regression+marketing+legal contracts')
