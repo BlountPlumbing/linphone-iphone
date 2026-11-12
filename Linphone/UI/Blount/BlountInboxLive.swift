@@ -230,3 +230,74 @@ enum BlountNotificationPolicy {
 		sessionActive && !deviceLocked
 	}
 }
+
+// MARK: - 5.120-5.142 rich internal features
+
+/// Atom 5.120 — broadcast review: recipient list + suppression state
+/// rendered BEFORE expansion; per-recipient results after.
+struct BlountBroadcastReview: Equatable {
+	let recipientCount: Int
+	let suppressedCount: Int
+	let body: String
+	var requiresExplicitSend = true
+}
+
+/// Atom 5.124 — quote/reaction controls in Team conversations.
+struct BlountRoomControls: Equatable {
+	let canQuote: Bool
+	let canReact: Bool
+	let quoteTargetSeq: Int?
+	var reactions: [String] = []
+}
+
+/// Atom 5.127 — edited/retracted rendering: shows state honestly,
+/// never promises recipient recall.
+struct BlountMessageStateLabel: Equatable {
+	let tombstone: Bool
+	let editRevision: Int
+	var label: String {
+		if tombstone { return "retracted" }
+		if editRevision > 0 { return "edited (v\(editRevision))" }
+		return ""
+	}
+}
+
+/// Atom 5.130-5.131 — typing indicators expire; stale presence is
+/// UNKNOWN, independent of message delivery state.
+struct BlountPresence: Equatable {
+	let typingUser: String?
+	let typingExpiresAt: Date?
+	let presenceKnown: Bool
+
+	static func isTyping(_ p: BlountPresence, now: Date) -> Bool {
+		guard let exp = p.typingExpiresAt else { return false }
+		return exp > now
+	}
+	/// Stale presence renders as unknown — never "offline" guessed from
+	/// missing delivery receipts.
+	static let staleLabel = "presence unknown"
+}
+
+/// Atom 5.133-5.136 — expiry policy surface: visibility timestamps,
+/// ownership explanation; retained company history is never deleted.
+struct BlountExpiryInfo: Equatable {
+	let visibleUntil: Date?
+	let policyOwner: String
+	static let explanation =
+		"Messages expire for recipients per company retention policy; "
+		+ "company audit records are retained."
+}
+
+/// Atom 5.138-5.141 — scheduled message intent: timezone + dispatch
+/// policy fields; automation DISABLED by default.
+struct BlountScheduledIntent: Equatable {
+	let body: String
+	let scheduledAt: Date?
+	let timeZone: String
+	let dispatchPolicy: String
+	static let automationEnabledByDefault = false
+	var cancellable: Bool {
+		// atom 5.139 — cancel before dispatch claim only
+		scheduledAt != nil && dispatchPolicy == "pending"
+	}
+}
