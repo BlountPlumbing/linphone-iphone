@@ -11,6 +11,8 @@ enum BlountTypography {
 	static let pageTitle = Font.largeTitle.weight(.bold)
 	/// Caller name on call surfaces.
 	static let callerName = Font.title.weight(.semibold)
+	/// Large secondary headings (directory avatars etc.).
+	static let title2 = Font.title2
 	/// Section headlines.
 	static let headline = Font.headline
 	/// Conversation body and primary list identity (~17pt at default).
