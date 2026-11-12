@@ -131,3 +131,102 @@ enum BlountMessageStatus {
 		return canonical
 	}
 }
+
+// MARK: - 5.32-5.36 attachment + voice surfaces
+
+/// Attachment control state — preview/remove/error per atom 5.34.
+struct BlountAttachmentControl: Equatable {
+	let ref: String
+	let filename: String
+	let mime: String
+	var state: State = .previewing
+
+	enum State: Equatable {
+		case previewing, uploading, attached, rejected(String), removed
+	}
+}
+
+/// Atom 5.35 — voice recording binds permission + explicit review:
+/// nothing records until permission granted AND user confirms send.
+struct BlountVoiceDraft {
+	var hasPermission = false
+	var recordedRef: String? = nil
+	var interrupted = false
+	/// Atom 5.36 — interrupted drafts survive an incoming call; the draft
+	/// store keeps the partial take until the user discards or sends.
+	var preservedAcrossCall = false
+
+	mutating func beginRecording(granted: Bool) {
+		hasPermission = granted
+		if granted { recordedRef = nil; interrupted = false }
+	}
+	mutating func noteInterrupted() { interrupted = true }
+	mutating func resumeAfterCall() {
+		if interrupted { preservedAcrossCall = true }
+		interrupted = false
+	}
+	var sendable: Bool { hasPermission && recordedRef != nil }
+}
+
+// MARK: - 5.37-5.38 scoped search
+
+/// Atom 5.38 — scoped search renders explicit offline limits; every row
+/// is server-projected, never a local-guess result.
+struct BlountSearchScope: Equatable {
+	let query: String
+	let scope: Scope
+	let offlineLimitNote: String?
+
+	enum Scope: String, Equatable { case conversations, messages, contacts }
+
+	static func offlineNote(for scope: Scope) -> String? {
+		// honest: local index only covers loaded pages
+		switch scope {
+		case .messages: return "offline: loaded pages only"
+		default: return nil
+		}
+	}
+}
+
+// MARK: - 5.40-5.43 assignment + archive
+
+/// Atom 5.40 — assignment state with server version-conflict feedback.
+struct BlountAssignmentView: Equatable {
+	let assignee: String?
+	let version: Int
+	var conflictMessage: String? = nil
+
+	/// Atom 5.41 — claim/reassign sends expected_version; a stale version
+	/// surfaces the conflict string instead of silently overwriting.
+	static func conflictText() -> String {
+		"assignment changed elsewhere — refresh and retry"
+	}
+}
+
+/// Atom 5.42/5.43 — archive is visibility-only; retention explanations
+/// never promise remote erasure.
+struct BlountArchiveState: Equatable {
+	let archived: Bool
+	static let retentionNote =
+		"archiving hides the conversation; records are retained per company policy"
+}
+
+// MARK: - 5.44-5.47 forward + notification reply
+
+/// Atom 5.45 — forward renders as a NEW intent with explicit destination
+/// review; it never mutates the source message.
+struct BlountForwardReview: Equatable {
+	let sourceConversationID: Int
+	let targetConversationID: Int
+	let targetLabel: String
+	let body: String
+	let requiresExplicitSend = true
+}
+
+/// Atom 5.47 — notification access/lock policy: a locked or revoked
+/// session cannot reply; the bearer check IS the lock-policy gate.
+enum BlountNotificationPolicy {
+	static func canReply(sessionActive: Bool, deviceLocked: Bool) -> Bool {
+		sessionActive && !deviceLocked
+	}
+}
