@@ -115,3 +115,19 @@ struct BlountSendReview: Equatable {
 	/// exists so the user sees exactly what stays internal.
 	var isSendable: Bool { audience == .customer && !body.isEmpty }
 }
+
+// MARK: - 5.29 status detail
+
+/// Renders the server-authoritative status projection only — never a
+/// client-side guess. `canonical` + `sub_state` come from
+/// phone.intent.status_projection(); when the server has not yet
+/// reported a projection the honest answer is "unavailable".
+enum BlountMessageStatus {
+	static func label(canonical: String?, subState: String?) -> String {
+		guard let canonical, !canonical.isEmpty else { return "unavailable" }
+		if let subState, !subState.isEmpty {
+			return "\(canonical) · \(subState)"
+		}
+		return canonical
+	}
+}
