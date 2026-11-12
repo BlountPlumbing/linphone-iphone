@@ -56,7 +56,7 @@ struct BlountShell: View {
 			connectionBar
 			BlountSectionPicker(selection: $selection)
 		}
-		.background(BlountTheme.Colors.workspace.ignoresSafeArea())
+		.background(BlountTheme.Colors.workspace)
 		.environmentObject(coreContext)
 	}
 
