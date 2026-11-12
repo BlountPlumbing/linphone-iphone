@@ -54,7 +54,7 @@ check('disabled auth actions', se.count('.disabled(true)') >= 2)
 check('fixture preview labeled non-auth', 'fixture only' in se.lower())
 
 # --- atoms 3.01/3.02/3.17: tokens + Dynamic Type roles, no fixed-size body text ---
-check('theme tokens present', all(t in files['BlountTheme.swift'] for t in ['0x18343C','0x112F38','0xF7F8F4','0x06776C','0xE6C98A','0x7A3B47']))
+check('theme tokens present', all(t in files['BlountTheme.swift'] for t in ['#18343C','#112F38','#F7F8F4','#06776C','#E6C98A','#7A3B47']))
 ty = files['BlountTypography.swift']
 check('semantic type roles', all(r in ty for r in ['largeTitle','headline','body','callout','footnote','caption']))
 check('no fixed-size fonts outside decorative icon', 'font(.system(size:' not in all_src.replace('.font(.system(size: 44))',''))
