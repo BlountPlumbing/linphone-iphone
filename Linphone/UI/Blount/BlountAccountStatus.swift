@@ -118,6 +118,6 @@ enum BlountAutoAnswer {
 	/// Reads the existing core config flag. NEVER writes — the redesign
 	/// preserves the policy without enabling it (config default is false).
 	static func isEnabled(core: Core) -> Bool {
-		core.config?.getBool(section: "sip", key: "auto_answer_replacing_calls") ?? false
+		core.config?.getBool(section: "sip", key: "auto_answer_replacing_calls", defaultValue: false) ?? false
 	}
 }
