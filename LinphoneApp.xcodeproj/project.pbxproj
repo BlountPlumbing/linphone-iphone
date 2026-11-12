@@ -247,6 +247,7 @@
 		B1050000000000000000001F /* BlountCallSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000001E /* BlountCallSession.swift */; };
 		B10500000000000000000020 /* BlountDialReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000021 /* BlountDialReview.swift */; };
 		B10500000000000000000022 /* BlountCallLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000023 /* BlountCallLog.swift */; };
+		B10500000000000000000024 /* BlountAccountAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000025 /* BlountAccountAccess.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -569,6 +570,7 @@
 		B1050000000000000000001E /* BlountCallSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallSession.swift; sourceTree = "<group>"; };
 		B10500000000000000000021 /* BlountDialReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountDialReview.swift; sourceTree = "<group>"; };
 		B10500000000000000000023 /* BlountCallLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallLog.swift; sourceTree = "<group>"; };
+		B10500000000000000000025 /* BlountAccountAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountAccountAccess.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1334,6 +1336,7 @@
 				B1050000000000000000001E /* BlountCallSession.swift */,
 				B10500000000000000000021 /* BlountDialReview.swift */,
 				B10500000000000000000023 /* BlountCallLog.swift */,
+				B10500000000000000000025 /* BlountAccountAccess.swift */,
 			);
 			path = Blount;
 			sourceTree = "<group>";
@@ -1886,6 +1889,7 @@
 				B1050000000000000000001F /* BlountCallSession.swift in Sources */,
 				B10500000000000000000020 /* BlountDialReview.swift in Sources */,
 				B10500000000000000000022 /* BlountCallLog.swift in Sources */,
+				B10500000000000000000024 /* BlountAccountAccess.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};

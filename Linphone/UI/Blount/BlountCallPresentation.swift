@@ -94,7 +94,7 @@ final class BlountCallPresentationStore: ObservableObject {
 
 	func remove(_ id: String) {
 		calls.removeValue(forKey: id)
-		if keyCallID == id { keyCallID = calls.keys.last }
+		if keyCallID == id { keyCallID = calls.values.max(by: { $0.updatedAt < $1.updatedAt })?.id }
 	}
 
 	func call(id: String) -> BlountCallPresentation? { calls[id] }
@@ -110,7 +110,7 @@ final class BlountCallPresentationStore: ObservableObject {
 	func ingestEngineEvent(call: Call, state: Call.State) {
 		let sdkId = call.callLog?.callId ?? ""
 		let uuid = BlountCallEventMapper.callKitUUID(forSdkCallID: sdkId)
-		let existing = call(sdkCallID: sdkId) ?? (uuid.flatMap { call(callKitUUID: $0) })
+		let existing = self.call(sdkCallID: sdkId) ?? (uuid.flatMap { self.call(callKitUUID: $0) })
 		let wasConnected = existing?.phase == .active || existing?.phase == .held
 		let phase = BlountCallEventMapper.phase(for: state, wasConnected: wasConnected)
 

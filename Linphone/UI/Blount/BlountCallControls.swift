@@ -72,7 +72,7 @@ final class BlountCallControls {
 	private static func findCall(sdkCallID: String, core: Core) -> Call? {
 		// Calls are reachable through the core's current calls; match by callLog id.
 		for c in core.calls {
-			if c.callLog?.callId == sdkCallID || c == core.currentCall { return c }
+			if c.callLog?.callId == sdkCallID { return c }
 		}
 		return core.currentCall
 	}
