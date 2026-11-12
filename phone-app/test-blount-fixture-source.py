@@ -79,3 +79,17 @@ check('no provisioning/deep-link auth surfaces in Blount dir',
 # Staff entry remains the single route:
 check('single staff entry symbol', all_src.count('BlountStaffEntry') >= 1)
 print('ok: atom 4.22 bypass-denial source checks')
+
+# --- atoms 4.23-4.27: transfer lifecycle source contracts ---
+tr = files.get('BlountTransfer.swift', '')
+check('transfer machine exists', 'BlountTransferMachine' in tr and 'BlountTransferController' in tr)
+check('local return not remote confirm', '.transferRequested' in tr and '.remoteConfirmed' in tr)
+check('consultation hold preserved', 'consultationHeld' in tr and 'beginConsultation' in tr)
+check('restore on cancel/failure', 'restoreAfterCancelOrFailure' in tr)
+tt = Path(root / 'LinphoneAppTests' / 'BlountTransferMachineTests.swift')
+check('transfer event-sequence tests exist', tt.exists())
+if tt.exists():
+    tt_src = tt.read_text(encoding='utf-8')
+    check('local-return test present', 'testLocalMethodReturnIsNotRemoteConfirmation' in tt_src)
+    check('restore tests present', 'testCancelRestoresOriginal' in tt_src and 'testRemoteEndWhilePendingFailsThenRestores' in tt_src)
+print('ok: atoms 4.23-4.27 transfer source+test contracts')
