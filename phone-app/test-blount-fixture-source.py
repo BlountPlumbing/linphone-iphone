@@ -65,3 +65,17 @@ check('fixture branch in RootView', 'BlountFixtureConfig.isEnabled' in app and '
 check('flag is reversible else-branch', '} else if coreContext.coreHasStartedOnce' in app)
 
 print('ALL CHECKS PASSED')
+
+# --- atom 4.22: staff bypass denial (provisioning/deep-link/MDM) ---
+ws = files.get('BlountWorkspace.swift', '')
+check('staff router exists', 'BlountStaffAccessRouter' in ws)
+check('held default module', 'BlountHeldStaffAccessModule' in ws and 'admissionState' in ws)
+check('sign-in gated on module', 'module.beginSignIn()' in ws and 'return false' in ws.lower() or 'func beginSignIn() -> Bool { false }' in ws)
+# No generic bypass surfaces inside Blount dir:
+banned = ['MobileConfig', 'installProfile', 'enrollmentProfile', 'itms-services',
+          'ProfileService', 'ASWebAuthenticationSession', 'SFSafariViewController']
+check('no provisioning/deep-link auth surfaces in Blount dir',
+      not any(b in all_src for b in banned))
+# Staff entry remains the single route:
+check('single staff entry symbol', all_src.count('BlountStaffEntry') >= 1)
+print('ok: atom 4.22 bypass-denial source checks')
