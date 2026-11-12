@@ -227,3 +227,103 @@ extension BlountMessagingClient {
 		try await conversationsPage(cursor: nil)
 	}
 }
+
+// MARK: - 5.79-5.84 internal room client
+
+struct BlountRoom: Decodable, Identifiable {
+	let id: Int
+	let name: String
+}
+
+struct BlountRoomMessage: Decodable, Identifiable {
+	let seq: Int
+	let authorID: Int
+	let author: String
+	let body: String?
+	let tombstone: Bool
+	let createdAt: String?
+	let editRevision: Int
+
+	enum CodingKeys: String, CodingKey {
+		case seq, author, body, tombstone
+		case authorID = "author_id"
+		case createdAt = "created_at"
+		case editRevision = "edit_revision"
+	}
+	var id: Int { seq }
+}
+
+struct BlountRoomPage: Decodable {
+	let ok: Bool
+	let messages: [BlountRoomMessage]
+	let nextAfterSeq: Int
+	let gaps: [Int]
+	enum CodingKeys: String, CodingKey {
+		case ok, messages, gaps
+		case nextAfterSeq = "next_after_seq"
+	}
+}
+
+extension BlountMessagingClient {
+	/// Atom 5.79 — Team inbox rows bind to the room list endpoint.
+	func rooms() async throws -> [BlountRoom] {
+		struct Page: Decodable { let ok: Bool; let rooms: [BlountRoom] }
+		let data = try await request("blount_pbx/phone/rooms")
+		return try JSONDecoder().decode(Page.self, from: data).rooms
+	}
+
+	/// Atom 5.80 — Team composer posts through the internal endpoint with
+	/// a client_msg_id idempotency key (same logical-intent guard).
+	func postRoomMessage(roomID: Int, clientMsgID: String,
+	                     body: String, mediaID: Int? = nil) async throws -> Int {
+		var payload: [String: Any] = ["client_msg_id": clientMsgID,
+		                              "body": body]
+		if let mediaID { payload["media_id"] = mediaID }
+		let data = try await request(
+			"blount_pbx/phone/rooms/\(roomID)/post",
+			method: "POST", body: payload)
+		struct R: Decodable { let ok: Bool; let seq: Int }
+		return try JSONDecoder().decode(R.self, from: data).seq
+	}
+
+	/// Atom 5.77 client — gap recovery: after_seq cursor + explicit gap
+	/// list; the UI must surface gaps, never silently skip.
+	func roomMessages(roomID: Int, afterSeq: Int = 0,
+	                  limit: Int = 50) async throws -> BlountRoomPage {
+		let data = try await request(
+			"blount_pbx/phone/rooms/\(roomID)/messages?after_seq=\(afterSeq)&limit=\(limit)")
+		return try JSONDecoder().decode(BlountRoomPage.self, from: data)
+	}
+
+	/// Atom 5.83 — room nudge -> authenticated refresh, same rule as M06.
+	func handleRoomNudge(roomID: Int) async throws -> BlountRoomPage {
+		try await roomMessages(roomID: roomID)
+	}
+}
+
+/// Atom 5.81 — member/audience visibility rendered BEFORE submission.
+struct BlountRoomAudiencePreview: Equatable {
+	let roomName: String
+	let memberCount: Int
+	let isMember: Bool
+	var canPost: Bool { isMember }
+}
+
+/// Atom 5.82 — attributed author/time/message identity row.
+struct BlountRoomRow: Equatable, Identifiable {
+	let seq: Int
+	let author: String
+	let timestamp: String
+	let body: String
+	let tombstone: Bool
+	var id: Int { seq }
+}
+
+/// Atom 5.84 — server-readable privacy description. NO E2EE badge —
+/// messages are server-readable by design; the UI says so honestly.
+enum BlountRoomPrivacy {
+	static let description =
+		"Internal team messages are stored on the company server and "
+		+ "readable by room members and company admins. Not end-to-end "
+		+ "encrypted."
+}
