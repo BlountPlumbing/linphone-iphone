@@ -251,6 +251,8 @@
 		B10500000000000000000026 /* BlountWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000027 /* BlountWorkspace.swift */; };
 		B10500000000000000000029 /* BlountTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000028 /* BlountTransfer.swift */; };
 		B1050000000000000000002A /* BlountAccountStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000002B /* BlountAccountStatus.swift */; };
+		B1050000000000000000002C /* BlountRecording.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000002D /* BlountRecording.swift */; };
+		B1050000000000000000002E /* BlountVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000002F /* BlountVideo.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -577,6 +579,8 @@
 		B10500000000000000000027 /* BlountWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountWorkspace.swift; sourceTree = "<group>"; };
 		B10500000000000000000028 /* BlountTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountTransfer.swift; sourceTree = "<group>"; };
 		B1050000000000000000002B /* BlountAccountStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountAccountStatus.swift; sourceTree = "<group>"; };
+		B1050000000000000000002D /* BlountRecording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountRecording.swift; sourceTree = "<group>"; };
+		B1050000000000000000002F /* BlountVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountVideo.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1346,6 +1350,8 @@
 				B10500000000000000000027 /* BlountWorkspace.swift */,
 				B10500000000000000000028 /* BlountTransfer.swift */,
 				B1050000000000000000002B /* BlountAccountStatus.swift */,
+				B1050000000000000000002D /* BlountRecording.swift */,
+				B1050000000000000000002F /* BlountVideo.swift */,
 			);
 			path = Blount;
 			sourceTree = "<group>";
@@ -1902,6 +1908,8 @@
 				B10500000000000000000026 /* BlountWorkspace.swift in Sources */,
 				B10500000000000000000029 /* BlountTransfer.swift in Sources */,
 				B1050000000000000000002A /* BlountAccountStatus.swift in Sources */,
+				B1050000000000000000002C /* BlountRecording.swift in Sources */,
+				B1050000000000000000002E /* BlountVideo.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
