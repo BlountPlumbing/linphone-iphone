@@ -254,6 +254,7 @@
 		B1050000000000000000002C /* BlountRecording.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000002D /* BlountRecording.swift */; };
 		B1050000000000000000002E /* BlountVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000002F /* BlountVideo.swift */; };
 		B10500000000000000000030 /* BlountCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000031 /* BlountCredentialStore.swift */; };
+		B10500000000000000000032 /* BlountMessagingClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000033 /* BlountMessagingClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -583,6 +584,7 @@
 		B1050000000000000000002D /* BlountRecording.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountRecording.swift; sourceTree = "<group>"; };
 		B1050000000000000000002F /* BlountVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountVideo.swift; sourceTree = "<group>"; };
 		B10500000000000000000031 /* BlountCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCredentialStore.swift; sourceTree = "<group>"; };
+		B10500000000000000000033 /* BlountMessagingClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountMessagingClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1355,6 +1357,7 @@
 				B1050000000000000000002D /* BlountRecording.swift */,
 				B1050000000000000000002F /* BlountVideo.swift */,
 				B10500000000000000000031 /* BlountCredentialStore.swift */,
+				B10500000000000000000033 /* BlountMessagingClient.swift */,
 			);
 			path = Blount;
 			sourceTree = "<group>";
@@ -1914,6 +1917,7 @@
 				B1050000000000000000002C /* BlountRecording.swift in Sources */,
 				B1050000000000000000002E /* BlountVideo.swift in Sources */,
 				B10500000000000000000030 /* BlountCredentialStore.swift in Sources */,
+				B10500000000000000000032 /* BlountMessagingClient.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
