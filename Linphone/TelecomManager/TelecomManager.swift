@@ -462,6 +462,11 @@ class TelecomManager: ObservableObject {
 	func onCallStateChanged(core: Core, call: Call, state cstate: Call.State, message: String) {
 		let callLog = call.callLog
 		let callId = callLog?.callId ?? ""
+
+		// Blount presentation layer — keyed by SDK call ID + CallKit UUID (additive hook).
+		DispatchQueue.main.async {
+			BlountCallPresentationStore.shared.ingestEngineEvent(call: call, state: cstate)
+		}
 		
 		if !callInProgress && participantsInvited {
 			if let remoteAddress = call.remoteAddress {
