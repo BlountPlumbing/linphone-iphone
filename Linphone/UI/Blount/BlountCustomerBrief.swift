@@ -65,6 +65,7 @@ struct BlountCustomerBrief: Decodable {
 	enum CodingKeys: String, CodingKey {
 		case scope, displayName = "display_name"
 		case balanceDue = "balance_due"
+		case overdue
 		case totalPaid = "total_paid"
 		case completedJobs = "completed_jobs"
 		case mostRecentTechnician = "most_recent_technician"
