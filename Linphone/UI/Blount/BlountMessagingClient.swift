@@ -83,6 +83,11 @@ final class BlountMessagingClient {
 		return parsed
 	}
 
+	/// Atom 5.17 — durable client intent id minted BEFORE submit and kept
+	/// until the server acknowledges binding. A retry reuses the SAME id so
+	/// the server's immutable binding dedupes instead of double-sending.
+	func newIntentID() -> String { UUID().uuidString }
+
 	/// Atom 5.08 — paginated authorized conversation list.
 	func conversations(limit: Int = 50, offset: Int = 0) async throws -> [BlountConversationSummary] {
 		let data = try await request("blount_pbx/phone/conversations?limit=\(limit)&offset=\(offset)")
