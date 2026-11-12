@@ -265,7 +265,9 @@ struct RootView: View {
 
 	var body: some View {
 		Group {
-			if coreContext.coreHasStartedOnce {
+			if BlountFixtureConfig.isEnabled {
+				BlountFixtureRoot()
+			} else if coreContext.coreHasStartedOnce {
 				if showWelcome {
 					ZStack {
 						WelcomeView()

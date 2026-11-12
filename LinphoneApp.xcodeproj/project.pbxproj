@@ -233,6 +233,14 @@
 		D7F5F6412C359F3B007FCF2F /* SipAddressesPopup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7F5F6402C359F3B007FCF2F /* SipAddressesPopup.swift */; };
 		D7FB55112AD447FD00A5AB15 /* RegisterFragment.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7FB55102AD447FD00A5AB15 /* RegisterFragment.swift */; };
 		D7FC8E4A2EBA12F90080C09D /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D7FC8E492EBA12F90080C09D /* Launch Screen.storyboard */; };
+		B10500000000000000000010 /* BlountTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000001 /* BlountTheme.swift */; };
+		B10500000000000000000011 /* BlountTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000002 /* BlountTypography.swift */; };
+		B10500000000000000000012 /* BlountFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000003 /* BlountFixture.swift */; };
+		B10500000000000000000013 /* BlountShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000004 /* BlountShell.swift */; };
+		B10500000000000000000014 /* BlountCallsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000005 /* BlountCallsScreen.swift */; };
+		B10500000000000000000015 /* BlountInboxScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000006 /* BlountInboxScreen.swift */; };
+		B10500000000000000000016 /* BlountPeopleScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000007 /* BlountPeopleScreen.swift */; };
+		B10500000000000000000017 /* BlountStaffEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000008 /* BlountStaffEntry.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -541,6 +549,14 @@
 		D7F5F6402C359F3B007FCF2F /* SipAddressesPopup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SipAddressesPopup.swift; sourceTree = "<group>"; };
 		D7FB55102AD447FD00A5AB15 /* RegisterFragment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegisterFragment.swift; sourceTree = "<group>"; };
 		D7FC8E492EBA12F90080C09D /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
+		B10500000000000000000001 /* BlountTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountTheme.swift; sourceTree = "<group>"; };
+		B10500000000000000000002 /* BlountTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountTypography.swift; sourceTree = "<group>"; };
+		B10500000000000000000003 /* BlountFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountFixture.swift; sourceTree = "<group>"; };
+		B10500000000000000000004 /* BlountShell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountShell.swift; sourceTree = "<group>"; };
+		B10500000000000000000005 /* BlountCallsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallsScreen.swift; sourceTree = "<group>"; };
+		B10500000000000000000006 /* BlountInboxScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountInboxScreen.swift; sourceTree = "<group>"; };
+		B10500000000000000000007 /* BlountPeopleScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountPeopleScreen.swift; sourceTree = "<group>"; };
+		B10500000000000000000008 /* BlountStaffEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountStaffEntry.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -832,6 +848,7 @@
 				D7B5678C2B28883700DE63EB /* Call */,
 				D719ABC62ABC6F0200B41C10 /* Main */,
 				D7702EF02AC7200600557C00 /* Welcome */,
+				B105000000000000000000F0 /* Blount */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -1286,6 +1303,21 @@
 				D792F1592F02BCC2002E3225 /* Intents.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		B105000000000000000000F0 /* Blount */ = {
+			isa = PBXGroup;
+			children = (
+				B10500000000000000000001 /* BlountTheme.swift */,
+				B10500000000000000000002 /* BlountTypography.swift */,
+				B10500000000000000000003 /* BlountFixture.swift */,
+				B10500000000000000000004 /* BlountShell.swift */,
+				B10500000000000000000005 /* BlountCallsScreen.swift */,
+				B10500000000000000000006 /* BlountInboxScreen.swift */,
+				B10500000000000000000007 /* BlountPeopleScreen.swift */,
+				B10500000000000000000008 /* BlountStaffEntry.swift */,
+			);
+			path = Blount;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1822,7 +1854,15 @@
 				D74C9CFA2ACACF2D0021626A /* WelcomePage2Fragment.swift in Sources */,
 				D74C9CFF2ACAEC5E0021626A /* PopupView.swift in Sources */,
 				D7DA67622ACCB2FA00E95002 /* LoginFragment.swift in Sources */,
-			);
+							B10500000000000000000010 /* BlountTheme.swift in Sources */,
+				B10500000000000000000011 /* BlountTypography.swift in Sources */,
+				B10500000000000000000012 /* BlountFixture.swift in Sources */,
+				B10500000000000000000013 /* BlountShell.swift in Sources */,
+				B10500000000000000000014 /* BlountCallsScreen.swift in Sources */,
+				B10500000000000000000015 /* BlountInboxScreen.swift in Sources */,
+				B10500000000000000000016 /* BlountPeopleScreen.swift in Sources */,
+				B10500000000000000000017 /* BlountStaffEntry.swift in Sources */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		D7458F2B2E0BDCF4000C957A /* Sources */ = {
