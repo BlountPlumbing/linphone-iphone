@@ -250,6 +250,7 @@
 		B10500000000000000000024 /* BlountAccountAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000025 /* BlountAccountAccess.swift */; };
 		B10500000000000000000026 /* BlountWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000027 /* BlountWorkspace.swift */; };
 		B10500000000000000000029 /* BlountTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000028 /* BlountTransfer.swift */; };
+		B1050000000000000000002A /* BlountAccountStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000002B /* BlountAccountStatus.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -575,6 +576,7 @@
 		B10500000000000000000025 /* BlountAccountAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountAccountAccess.swift; sourceTree = "<group>"; };
 		B10500000000000000000027 /* BlountWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountWorkspace.swift; sourceTree = "<group>"; };
 		B10500000000000000000028 /* BlountTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountTransfer.swift; sourceTree = "<group>"; };
+		B1050000000000000000002B /* BlountAccountStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountAccountStatus.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1343,6 +1345,7 @@
 				B10500000000000000000025 /* BlountAccountAccess.swift */,
 				B10500000000000000000027 /* BlountWorkspace.swift */,
 				B10500000000000000000028 /* BlountTransfer.swift */,
+				B1050000000000000000002B /* BlountAccountStatus.swift */,
 			);
 			path = Blount;
 			sourceTree = "<group>";
@@ -1898,6 +1901,7 @@
 				B10500000000000000000024 /* BlountAccountAccess.swift in Sources */,
 				B10500000000000000000026 /* BlountWorkspace.swift in Sources */,
 				B10500000000000000000029 /* BlountTransfer.swift in Sources */,
+				B1050000000000000000002A /* BlountAccountStatus.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
