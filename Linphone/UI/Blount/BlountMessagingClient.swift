@@ -20,6 +20,12 @@ struct BlountConversationSummary: Decodable, Identifiable {
 	let id: Int
 	let name: String
 	let channel: String
+	let canonicalKey: String?
+
+	enum CodingKeys: String, CodingKey {
+		case id, name, channel
+		case canonicalKey = "canonical_key"
+	}
 }
 
 enum BlountMessagingError: Error {
