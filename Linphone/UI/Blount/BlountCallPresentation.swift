@@ -45,6 +45,7 @@ struct BlountCallPresentation: Identifiable, Equatable {
 	/// Transfer lifecycle — local method return is NOT remote completion.
 	var transferState: BlountTransferState = .idle
 	var contextGeneration = 0
+	var updatedAt = Date()
 
 	static func == (l: BlountCallPresentation, r: BlountCallPresentation) -> Bool {
 		l.id == r.id && l.phase == r.phase && l.muted == r.muted && l.onHold == r.onHold
@@ -73,7 +74,14 @@ final class BlountCallPresentationStore: ObservableObject {
 
 	static let shared = BlountCallPresentationStore()
 
+	/// Select a call as the key call (drives strip/banner + return target).
+	func select(sdkCallID: String) {
+		keyCallID = sdkCallID
+	}
+
 	func upsert(_ p: BlountCallPresentation) {
+		var p = p
+		p.updatedAt = Date()
 		calls[p.id] = p
 		keyCallID = p.id
 	}

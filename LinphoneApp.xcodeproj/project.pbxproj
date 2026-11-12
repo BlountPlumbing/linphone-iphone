@@ -241,9 +241,10 @@
 		B10500000000000000000015 /* BlountInboxScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000006 /* BlountInboxScreen.swift */; };
 		B10500000000000000000016 /* BlountPeopleScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000007 /* BlountPeopleScreen.swift */; };
 		B10500000000000000000017 /* BlountStaffEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000008 /* BlountStaffEntry.swift */; };
-		B10500000000000000000019 /* BlountCallPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000017 /* BlountCallPresentation.swift */; };
+		B10500000000000000000019 /* BlountCallPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000001D /* BlountCallPresentation.swift */; };
 		B1050000000000000000001A /* BlountCallEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10500000000000000000018 /* BlountCallEvents.swift */; };
 		B1050000000000000000001B /* BlountCallControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000001C /* BlountCallControls.swift */; };
+		B1050000000000000000001F /* BlountCallSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1050000000000000000001E /* BlountCallSession.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -560,9 +561,10 @@
 		B10500000000000000000006 /* BlountInboxScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountInboxScreen.swift; sourceTree = "<group>"; };
 		B10500000000000000000007 /* BlountPeopleScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountPeopleScreen.swift; sourceTree = "<group>"; };
 		B10500000000000000000008 /* BlountStaffEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountStaffEntry.swift; sourceTree = "<group>"; };
-		B10500000000000000000017 /* BlountCallPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallPresentation.swift; sourceTree = "<group>"; };
+		B1050000000000000000001D /* BlountCallPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallPresentation.swift; sourceTree = "<group>"; };
 		B10500000000000000000018 /* BlountCallEvents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallEvents.swift; sourceTree = "<group>"; };
 		B1050000000000000000001C /* BlountCallControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallControls.swift; sourceTree = "<group>"; };
+		B1050000000000000000001E /* BlountCallSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlountCallSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -1322,9 +1324,10 @@
 				B10500000000000000000006 /* BlountInboxScreen.swift */,
 				B10500000000000000000007 /* BlountPeopleScreen.swift */,
 				B10500000000000000000008 /* BlountStaffEntry.swift */,
-				B10500000000000000000017 /* BlountCallPresentation.swift */,
+				B1050000000000000000001D /* BlountCallPresentation.swift */,
 				B10500000000000000000018 /* BlountCallEvents.swift */,
 				B1050000000000000000001C /* BlountCallControls.swift */,
+				B1050000000000000000001E /* BlountCallSession.swift */,
 			);
 			path = Blount;
 			sourceTree = "<group>";
@@ -1874,6 +1877,7 @@
 				B10500000000000000000019 /* BlountCallPresentation.swift in Sources */,
 				B1050000000000000000001A /* BlountCallEvents.swift in Sources */,
 				B1050000000000000000001B /* BlountCallControls.swift in Sources */,
+				B1050000000000000000001F /* BlountCallSession.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};
