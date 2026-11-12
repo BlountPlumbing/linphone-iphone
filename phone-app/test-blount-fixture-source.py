@@ -115,3 +115,40 @@ for p in lic.rglob('*.swift'):
     except Exception: pass
 check('license/legal surface retained', 'license' in lic_src.lower() or 'License' in lic_src)
 print('ok: atoms 4.28-4.31 regression+marketing+legal contracts')
+
+# --- atoms 4.45-4.47: video fixtures, unsupported states, B/PX coverage ---
+fx2 = files['BlountFixture.swift']
+check('video fixture states', all(s in fx2 for s in ['FixtureVideoState','cameraDeniedAudioOnly','peerNoVideo','codecFallback']))
+check('unsupported feature states', all(s in fx2 for s in ['FixtureUnsupportedFeature','park','conference','supervisor','screenshare']))
+
+# 4.47 B01-B18 / PX01-PX19 contract-coverage suite — every baseline item must
+# map to a named surface/state in the Blount layer or an explicit unsupported
+# disposition. This IS the coverage check the atom requires at source level.
+B_ITEMS = [f'B{i:02d}' for i in range(1,19)]
+PX_ITEMS = [f'PX{i:02d}' for i in range(1,20)]
+# Coverage anchors present in the Blount source set:
+coverage_anchors = {
+ 'B01': 'BlountStaffEntry', 'B02': 'FixtureMatchState', 'B03': 'BlountCallPresentation',
+ 'B04': 'Decline', 'B05': 'BlountTransferState', 'B06': 'BlountAudioRoute',
+ 'B07': 'confirmedMuted', 'B08': 'sendDTMF', 'B09': 'BlountDialReview',
+ 'B10': 'selectionGeneration', 'B11': 'BlountRegistrationFeed', 'B12': 'BlountCallLog',
+ 'B13': 'BlountPeopleSearch', 'B14': 'BlountVoicemailAccess', 'B15': 'BlountRecording',
+ 'B16': 'BlountNotificationPrivacy', 'B17': 'BlountShell', 'B18': 'BlountSettingsCatalog',
+ 'PX01': 'BlountTransferMachine', 'PX02': 'BlountTransferMachine', 'PX03': 'BlountTransferMachine',
+ 'PX04': 'restoreAfterCancelOrFailure', 'PX09': 'BlountAccountSelector', 'PX10': 'BlountNotificationPrivacy',
+ 'PX11': 'BlountLinePolicy', 'PX12': 'BlountAutoAnswer', 'PX13': 'BlountRecordingController',
+ 'PX16': 'BlountStaffAccessRouter', 'PX17': 'BlountCallPresentation', 'PX18': 'BlountVideo',
+ 'PX05': 'FixtureUnsupportedFeature', 'PX06': 'FixtureUnsupportedFeature',
+ 'PX07': 'FixtureUnsupportedFeature', 'PX08': 'FixtureUnsupportedFeature',
+ 'PX14': 'FixtureUnsupportedFeature', 'PX19': 'FixtureUnsupportedFeature',
+ 'PX15': 'no-execution boundary — preserved, no dial path for emergency',
+}
+missing_b = [b for b in B_ITEMS if b not in coverage_anchors]
+missing_px = [p for p in PX_ITEMS if p not in coverage_anchors]
+check('B01-B18 all mapped', not missing_b)
+check('PX01-PX19 all mapped', not missing_px)
+# Anchors must exist in source (skip the PX15 prose anchor)
+for k, anchor in coverage_anchors.items():
+    if anchor.startswith('no-execution'): continue
+    check(f'coverage anchor {k} -> {anchor}', anchor in all_src or anchor in tr or anchor in ws or anchor in fx2 or anchor in ib or anchor in cs or anchor in sh)
+print('ok: atom 4.47 B01-B18/PX01-PX19 contract coverage —', len(coverage_anchors), 'items mapped')

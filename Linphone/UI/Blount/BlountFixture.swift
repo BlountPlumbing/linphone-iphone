@@ -136,3 +136,36 @@ enum BlountFixtureData {
 
 	static let inboxStates: [FixtureInboxState] = [.loading, .empty, .denied, .ready]
 }
+
+// MARK: - atoms 4.45/4.46 fixture states
+
+/// Video permission/peer-capability fixture cases (atom 4.45).
+enum FixtureVideoState: String, CaseIterable {
+	case cameraGrantedPeerVideo
+	case cameraDeniedAudioOnly
+	case peerNoVideo
+	case codecFallback
+	var label: String {
+		switch self {
+		case .cameraGrantedPeerVideo: return "Camera ok — peer sends video"
+		case .cameraDeniedAudioOnly: return "Camera denied — audio only"
+		case .peerNoVideo: return "Peer has no video"
+		case .codecFallback: return "Codec fallback — audio only"
+		}
+	}
+}
+
+/// Baseline UNSUPPORTED-NOW features — rendered as honest unavailable states,
+/// never as working controls (atom 4.46; PX05-08/PX14/PX19 dispositions).
+enum FixtureUnsupportedFeature: String, CaseIterable {
+	case park, conference, supervisor, screenshare
+	var label: String {
+		switch self {
+		case .park: return "Call park — not available"
+		case .conference: return "Conference — not available"
+		case .supervisor: return "Supervisor — not available"
+		case .screenshare: return "Screen share — not available"
+		}
+	}
+	var reason: String { "Unsupported in this build" }
+}
