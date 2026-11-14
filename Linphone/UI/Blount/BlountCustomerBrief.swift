@@ -127,7 +127,7 @@ final class BlountCustomerBriefClient {
 	func requestBrief(callID: String,
 	                  accountGeneration: Int,
 	                  authGeneration: Int,
-	                  transport: (String) async throws -> BlountCustomerBrief?) async -> BlountCustomerBrief? {
+	                  transport: @escaping (String) async throws -> BlountCustomerBrief?) async -> BlountCustomerBrief? {
 		let key = BlountBriefRequestKey(
 			callID: callID, accountGeneration: accountGeneration,
 			authGeneration: authGeneration,
