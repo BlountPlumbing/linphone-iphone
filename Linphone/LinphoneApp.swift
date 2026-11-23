@@ -208,6 +208,13 @@ struct LinphoneApp: App {
 		if AppServices.configIfAvailable != nil {
 			let _ = CoreContext.shared
 			configAvailable = true
+			// The early fallback registry was wired only for the pre-config
+			// window. Once config exists the SDK's own PushKit path must own
+			// every voip push — a lingering delegate here would keep feeding
+			// calls into the 4s fake-ring/auto-unanswered stub for the rest of
+			// the process's life (wake-death defect).
+			voipRegistry.delegate = nil
+			voipRegistry.desiredPushTypes = []
 		} else {
 			Log.warn("AppServices.config not available yet, retrying in 1s...")
 			DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
