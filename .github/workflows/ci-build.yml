@@ -47,7 +47,7 @@ jobs:
   # ---------------------------------------------------------------- unsigned --
   build-unsigned:
     name: Build (unsigned) — rebrand + patch + compile
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +85,7 @@ jobs:
   # ------------------------------------------------------------------ signed --
   archive-signed:
     name: Archive (signed) — needs A4 cert/profiles + PBX_SHIM_TOKEN
-    runs-on: macos-latest
+    runs-on: macos-26
     needs: build-unsigned
     # Flip `A4_SIGNING_READY` repo variable to 'true' once the VoIP Services
     # cert + ASC API key secrets exist (plan atom A4). Until then the unsigned
