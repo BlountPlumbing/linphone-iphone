@@ -218,6 +218,99 @@ jobs:
           security delete-keychain build.keychain 2>/dev/null || true
           rm -f ~/Library/MobileDevice/Provisioning\ Profiles/PROFILE_{MAIN,MSG,EXT,INTENTS}.mobileprovision
 
+
+  # ------------------------------------------------------ publish (ubuntu) --
+  # After the signed upload lands, poll ASC for the build to finish processing
+  # then attach it to every beta group + set the What to Test text so the
+  # build is actually installable + described on TestFlight without a portal
+  # visit. ubuntu runner — no macos starvation.
+  publish-testflight:
+    name: Publish — attach beta groups + What to Test
+    needs: archive-signed
+    if: vars.A4_SIGNING_READY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install cryptography
+        run: pip install cryptography
+      - name: Publish build on TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+          ASC_ISSUER: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          ASC_P8_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          NOTES: "build ${{ github.run_number }} — ${{ github.event.head_commit.message || github.event.inputs.notes }}"
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.request, urllib.error
+          from cryptography.hazmat.primitives import hashes, serialization
+          from cryptography.hazmat.primitives.asymmetric.ec import ECDSA
+          from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+          def b64u(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+          p8 = base64.b64decode(os.environ["ASC_P8_B64"])
+          key = serialization.load_pem_private_key(p8, password=None)
+
+          def token():
+              now = int(time.time())
+              hdr = b64u(json.dumps({"alg":"ES256","kid":os.environ["ASC_KEY_ID"],"typ":"JWT"}).encode())
+              pay = b64u(json.dumps({"iss":os.environ["ASC_ISSUER"],"iat":now,"exp":now+1100,"aud":"appstoreconnect-v1"}).encode())
+              der = key.sign(f"{hdr}.{pay}".encode(), ECDSA(hashes.SHA256()))
+              r,s = decode_dss_signature(der)
+              return f"{hdr}.{pay}.{b64u(r.to_bytes(32,'big')+s.to_bytes(32,'big'))}"
+
+          def call(method, path, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request("https://api.appstoreconnect.apple.com"+path,
+                  data=data, method=method,
+                  headers={"Authorization":"Bearer "+token(),"Content-Type":"application/json"})
+              try:
+                  r = urllib.request.urlopen(req)
+                  raw = r.read()
+                  return r.status, (json.loads(raw) if raw.strip() else {})
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read()[:300]
+
+          want = os.environ["BUILD_NUMBER"]
+          notes = os.environ.get("NOTES","build "+want).split("\n")[0][:4000]
+          st, d = call("GET", "/v1/apps?filter[bundleId]=net.blount.phone&fields[apps]=bundleId")
+          app = next((a for a in d.get("data",[]) if a["attributes"].get("bundleId")=="net.blount.phone"), None)
+          if not app: print("no app"); raise SystemExit(1)
+          appid = app["id"]
+
+          bvid, state = None, "?"
+          for _ in range(60):  # up to ~30min of ASC processing
+              st, d = call("GET", f"/v1/builds?filter[app]={appid}&filter[version]={want}&limit=5")
+              if d.get("data"):
+                  bvid = d["data"][0]["id"]; state = d["data"][0]["attributes"].get("processingState")
+                  if state == "VALID": break
+              time.sleep(30)
+          print("build", want, "id", bvid, "state", state)
+          if not bvid or state != "VALID":
+              print("not VALID after wait — publish skipped, retry via build-state-check publish_build"); raise SystemExit(0)
+
+          st, d = call("GET", f"/v1/betaGroups?filter[app]={appid}&limit=50")
+          for g in d.get("data",[]):
+              st2, _ = call("POST", f"/v1/betaGroups/{g['id']}/relationships/builds",
+                            {"data":[{"type":"builds","id":bvid}]})
+              print("attach", g["attributes"].get("name"), st2)
+
+          st, d = call("GET", f"/v1/builds/{bvid}/betaBuildLocalizations")
+          en = next((l for l in d.get("data",[]) if l["attributes"].get("locale")=="en-US"), None)
+          if en:
+              st, _ = call("PATCH", f"/v1/betaBuildLocalizations/{en['id']}",
+                           {"data":{"type":"betaBuildLocalizations","id":en["id"],
+                            "attributes":{"whatsNew":notes}}})
+          else:
+              st, _ = call("POST", "/v1/betaBuildLocalizations",
+                           {"data":{"type":"betaBuildLocalizations",
+                            "attributes":{"locale":"en-US","whatsNew":notes},
+                            "relationships":{"build":{"data":{"type":"builds","id":bvid}}}}})
+          print("whatsNew", st, notes[:80])
+          PY
+
 # MANUAL-SIGNING ALTERNATIVE (if ASC API key isn't available): import the
 # distribution cert into a temp keychain + drop 4 .mobileprovision files into
 # ~/Library/MobileDevice/Provisioning Profiles/, then archive with

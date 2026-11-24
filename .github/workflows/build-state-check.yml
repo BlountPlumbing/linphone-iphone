@@ -14,6 +14,14 @@ on:
         description: Raw ASC API path to GET instead (e.g. /v1/betaFeedbackCrashSubmissions?filter[app]=X)
         required: false
         default: ""
+      publish_build:
+        description: Attach this cfBundleVersion to all app beta groups + set What to Test
+        required: false
+        default: ""
+      publish_notes:
+        description: What to Test text for the publish
+        required: false
+        default: ""
 jobs:
   check-build-state:
     name: Query ASC for uploaded build processing state
@@ -32,6 +40,8 @@ jobs:
           BUNDLE_ID: ${{ inputs.bundle_id }}
           BUILD_NUMBER: ${{ inputs.build_number }}
           ASC_PATH: ${{ inputs.asc_path }}
+          PUBLISH_BUILD: ${{ inputs.publish_build }}
+          PUBLISH_NOTES: ${{ inputs.publish_notes }}
         run: |
           python3 - <<'PY'
           import base64, json, os, time, urllib.request, urllib.error
@@ -54,10 +64,57 @@ jobs:
                   headers={"Authorization":f"Bearer {tok}"})
               return json.loads(urllib.request.urlopen(req).read())
 
+          def call(method, path, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request("https://api.appstoreconnect.apple.com"+path,
+                  data=data, method=method,
+                  headers={"Authorization":f"Bearer {tok}","Content-Type":"application/json"})
+              try:
+                  r = urllib.request.urlopen(req)
+                  raw = r.read()
+                  return r.status, (json.loads(raw) if raw.strip() else {})
+              except urllib.error.HTTPError as e:
+                  raw = e.read()
+                  try: detail = json.loads(raw)
+                  except Exception: detail = raw[:200]
+                  return e.code, detail
+
           raw_path = os.environ.get("ASC_PATH","").strip()
           if raw_path:
               assert raw_path.startswith("/v1/"), "asc_path must start with /v1/"
               print(json.dumps(get(raw_path), indent=1)[:8000])
+              raise SystemExit(0)
+
+          pub = os.environ.get("PUBLISH_BUILD","").strip()
+          if pub:
+              bid = os.environ["BUNDLE_ID"]
+              notes = os.environ.get("PUBLISH_NOTES","").strip() or f"Build {pub}"
+              apps = get(f"/v1/apps?filter[bundleId]={bid}&fields[apps]=bundleId,name")
+              app = next((a for a in apps.get("data",[]) if a["attributes"].get("bundleId")==bid), None)
+              if not app: print("no exact-bundle app"); raise SystemExit(1)
+              appid = app["id"]; print("APP", appid)
+              bl = get(f"/v1/builds?filter[app]={appid}&filter[version]={pub}&limit=5")
+              if not bl.get("data"): print("build not found", pub); raise SystemExit(1)
+              b = bl["data"][0]; bvid = b["id"]
+              print("BUILD", bvid, b["attributes"].get("version"), b["attributes"].get("processingState"))
+              groups = get(f"/v1/betaGroups?filter[app]={appid}&limit=50")
+              for g in groups.get("data",[]):
+                  st, d = call("POST", f"/v1/betaGroups/{g['id']}/relationships/builds",
+                               {"data":[{"type":"builds","id":bvid}]})
+                  print("ATTACH", g["attributes"].get("name"), g["id"], "->", st)
+              locs = get(f"/v1/builds/{bvid}/betaBuildLocalizations")
+              en = next((l for l in locs.get("data",[]) if l["attributes"].get("locale")=="en-US"), None)
+              if en:
+                  st, d = call("PATCH", f"/v1/betaBuildLocalizations/{en['id']}",
+                               {"data":{"type":"betaBuildLocalizations","id":en["id"],
+                                "attributes":{"whatsNew":notes}}})
+                  print("LOCALE en-US PATCH", st)
+              else:
+                  st, d = call("POST", "/v1/betaBuildLocalizations",
+                               {"data":{"type":"betaBuildLocalizations",
+                                "attributes":{"locale":"en-US","whatsNew":notes},
+                                "relationships":{"build":{"data":{"type":"builds","id":bvid}}}}})
+                  print("LOCALE en-US POST", st)
               raise SystemExit(0)
 
           bid = os.environ["BUNDLE_ID"]
