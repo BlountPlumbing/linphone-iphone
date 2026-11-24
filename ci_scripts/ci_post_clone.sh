@@ -13,6 +13,14 @@ cd "$REPO_ROOT"
 bash "$REPO_ROOT/phone-app/rebrand.sh" "$REPO_ROOT"
 git apply --verbose "$REPO_ROOT/phone-app/corecontext-shim.patch"
 
+# usernotifications.filtering is a restricted entitlement — Xcode managed
+# signing cannot enable it on the App ID (DVTPortalAppIDErrorDomain 5) and
+# aborts the whole signing pass. The shipped GHA profile never embedded it,
+# so dropping it here produces a functionally identical artifact.
+/usr/libexec/PlistBuddy -c \
+  "Delete :com.apple.developer.usernotifications.filtering" \
+  "$REPO_ROOT/msgNotificationService/msgNotificationService.entitlements" || true
+
 # PBX_SHIM_* are xcconfig build settings — rebrand.sh appended the keys to
 # Shared.xcconfig (URL baked via the :/$()/ idiom, token deliberately blank).
 # Inject the token the same way GHA does — a build setting, never a
