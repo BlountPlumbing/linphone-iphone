@@ -53,15 +53,16 @@ jobs:
           apps = get(f"/v1/apps?filter[bundleId]={bid}&fields[apps]=bundleId,name")
           if not apps.get("data"):
               print(f"NO APP for {bid}"); raise SystemExit(1)
-          app = apps["data"][0]
-          print(f"APP {app['id']} {app['attributes'].get('name')} ({bid})")
-          builds = get(f"/v1/builds?filter[app]={app['id']}&sort=-uploadedDate&limit=10")
           want = os.environ.get("BUILD_NUMBER","").strip()
-          found = False
-          for b in builds.get("data",[]):
-              a = b["attributes"]
-              mark = " <== WANTED" if want and str(a.get("version"))==want else ""
-              if mark: found = True
-              print(f"build {a.get('cfBundleVersion')} v{a.get('version')} state={a.get('processingState')} expired={a.get('expired')} uploaded={a.get('uploadedDate')}{mark}")
-          if want and not found: print(f"build {want} NOT in latest 10")
+          for app in apps["data"][:6]:
+              aa = app["attributes"]
+              print(f"APP {app['id']} {aa.get('name')} bundleId={aa.get('bundleId')}")
+              builds = get(f"/v1/builds?filter[app]={app['id']}&sort=-uploadedDate&limit=12")
+              found = False
+              for b in builds.get("data",[]):
+                  a = b["attributes"]
+                  mark = " <== WANTED" if want and str(a.get("version"))==want else ""
+                  if mark: found = True
+                  print(f"  build {a.get('version')} state={a.get('processingState')} expired={a.get('expired')} uploaded={a.get('uploadedDate')}{mark}")
+              if want and not found: print(f"  build {want} NOT in latest 12")
           PY
