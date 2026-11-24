@@ -159,15 +159,19 @@ struct LinphoneApp: App {
 	private let voipRegistry = PKPushRegistry(queue: coreQueue)
 
 	init() {
+		PushShimReporter.mark("launch.m0.init")
 #if DEBUG
 		LinphoneApp.applyUITestMDMConfigIfNeeded()
 #endif
 		if !configAvailable {
+			PushShimReporter.mark("launch.m1.noconfig")
 			voipRegistry.delegate = earlyPushDelegate
 			voipRegistry.desiredPushTypes = [.voIP]
 			waitForConfig()
 		} else {
+			PushShimReporter.mark("launch.m1.config")
 			let _ = CoreContext.shared
+			PushShimReporter.mark("launch.m2.corectx")
 		}
 	}
 
@@ -206,9 +210,12 @@ struct LinphoneApp: App {
 
 	private func waitForConfig() {
 		if AppServices.configIfAvailable != nil {
+			PushShimReporter.mark("launch.m3.waitcfg.ok")
 			let _ = CoreContext.shared
+			PushShimReporter.mark("launch.m4.corectx")
 			configAvailable = true
 		} else {
+			PushShimReporter.mark("launch.m3.waitcfg.retry")
 			Log.warn("AppServices.config not available yet, retrying in 1s...")
 			DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
 				waitForConfig()

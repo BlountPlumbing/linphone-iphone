@@ -28,6 +28,7 @@ class EarlyPushkitDelegate: NSObject, PKPushRegistryDelegate, CXProviderDelegate
 
 	func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
 		Log.info("[EarlyPushkitDelegate] User tried to answer, ending call as device is locked")
+		PushShimReporter.mark("push.m3.answer")
 		action.fail()
 		provider.reportCall(with: action.callUUID, endedAt: .init(), reason: .unanswered)
 		activeCalls = activeCalls.filter { $0.value.uuid != action.callUUID }
@@ -35,10 +36,12 @@ class EarlyPushkitDelegate: NSObject, PKPushRegistryDelegate, CXProviderDelegate
 	}
 
 	func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
+		PushShimReporter.mark("push.m1.creds")
 		Log.info("[EarlyPushkitDelegate] Received push credentials, ignoring until core is ready")
 	}
 
 	func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
+		PushShimReporter.mark("push.m0.received")
 		Log.info("[EarlyPushkitDelegate] Received incoming push while core is not ready, reporting call to CallKit")
 		let signature = String(describing: payload.dictionaryPayload as NSDictionary)
 
@@ -58,7 +61,10 @@ class EarlyPushkitDelegate: NSObject, PKPushRegistryDelegate, CXProviderDelegate
 
 		provider.reportNewIncomingCall(with: uuid, update: makeCallUpdate()) { error in
 			if let error = error {
+				PushShimReporter.mark("push.m2.callkit.err", detail: error.localizedDescription)
 				Log.error("[EarlyPushkitDelegate] Failed to report call to CallKit: \(error.localizedDescription)")
+			} else {
+				PushShimReporter.mark("push.m2.callkit.ok")
 			}
 		}
 

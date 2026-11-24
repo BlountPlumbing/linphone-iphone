@@ -13,7 +13,7 @@ index 6427d78..6fe9bba 100644
  				case .Cleared:
  					Log.info("[CoreContext][onAccountRegistrationStateChanged] Account \(account.displayName()) registration was cleared.")
  				case .Failed:
-@@ -735,6 +739,122 @@ enum AppServices {
+@@ -735,6 +739,158 @@ enum AppServices {
  	static var corePreferences = CorePreferences(config: config)
  }
  
@@ -133,6 +133,42 @@ index 6427d78..6fe9bba 100644
 +	}
 +}
 +
++
++// MARK: - Blount device-log beacons (phone-app/corecontext-shim.patch)
++private var pbxMarkCounts: [String: Int] = [:]
++private let pbxMarkLock = DispatchQueue(label: "pbx.mark.lock")
++
++extension PushShimReporter {
++	/// Best-effort milestone beacon -> shim POST /logs. Per-tag cap stops retry
++	/// loops from flooding; fire-and-forget - a missing beacon after a crash
++	/// is itself diagnostic (process died before URLSession could flush).
++	static func mark(_ tag: String, detail: String = "") {
++		var send = false
++		pbxMarkLock.sync {
++			let n = (pbxMarkCounts[tag] ?? 0) + 1
++			pbxMarkCounts[tag] = n
++			send = n <= 30
++		}
++		guard send,
++			  let endpoint = endpointURL(), let token = shimToken() else { return }
++		let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
++		let body: [String: Any] = [
++			"tag": tag,
++			"detail": detail,
++			"build": build,
++			"ts": ISO8601DateFormatter().string(from: Date()),
++			"device": UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
++		]
++		guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return }
++		var request = URLRequest(url: endpoint.appendingPathComponent("logs"))
++		request.httpMethod = "POST"
++		request.setValue(token, forHTTPHeaderField: "X-Shim-Token")
++		request.setValue("application/json", forHTTPHeaderField: "Content-Type")
++		request.httpBody = httpBody
++		request.timeoutInterval = 10
++		URLSession.shared.dataTask(with: request).resume()
++	}
++}
  // swiftlint:enable line_length
  // swiftlint:enable cyclomatic_complexity
  // swiftlint:enable identifier_name
