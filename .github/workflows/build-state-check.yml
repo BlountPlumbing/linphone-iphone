@@ -10,6 +10,10 @@ on:
         description: cfBundleVersion to look for (blank = report latest 10)
         required: false
         default: "55"
+      asc_path:
+        description: Raw ASC API path to GET instead (e.g. /v1/betaFeedbackCrashSubmissions?filter[app]=X)
+        required: false
+        default: ""
 jobs:
   check-build-state:
     name: Query ASC for uploaded build processing state
@@ -27,6 +31,7 @@ jobs:
           ASC_P8_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
           BUILD_NUMBER: ${{ inputs.build_number }}
+          ASC_PATH: ${{ inputs.asc_path }}
         run: |
           python3 - <<'PY'
           import base64, json, os, time, urllib.request, urllib.error
@@ -48,6 +53,12 @@ jobs:
               req = urllib.request.Request("https://api.appstoreconnect.apple.com"+path,
                   headers={"Authorization":f"Bearer {tok}"})
               return json.loads(urllib.request.urlopen(req).read())
+
+          raw_path = os.environ.get("ASC_PATH","").strip()
+          if raw_path:
+              assert raw_path.startswith("/v1/"), "asc_path must start with /v1/"
+              print(json.dumps(get(raw_path), indent=1)[:8000])
+              raise SystemExit(0)
 
           bid = os.environ["BUNDLE_ID"]
           apps = get(f"/v1/apps?filter[bundleId]={bid}&fields[apps]=bundleId,name")
