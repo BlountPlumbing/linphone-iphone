@@ -1,0 +1,220 @@
+name: Xcode Cloud admin (ASC)
+on:
+  workflow_dispatch:
+    inputs:
+      xc_op:
+        description: Operation
+        required: true
+        default: probe
+        type: choice
+        options: [probe, register-repo, create-product, create-workflow, chain, run, poll]
+      repo_name:
+        description: GitHub repo (owner/name)
+        required: false
+        default: "BlountPlumbing/linphone-iphone"
+      branch:
+        description: Source branch for run
+        required: false
+        default: "release/6.2-blount"
+      app_id:
+        description: ASC app id for the product
+        required: false
+        default: "6826540875"
+      workflow_name:
+        description: ciWorkflow display name
+        required: false
+        default: "Blount Phone — release/6.2-blount"
+jobs:
+  xc-admin:
+    name: Xcode Cloud provisioning via ASC API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install cryptography
+        run: pip install cryptography
+      - name: Run xc_op
+        env:
+          ASC_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+          ASC_ISSUER: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          ASC_P8_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+          XC_OP: ${{ inputs.xc_op }}
+          REPO_NAME: ${{ inputs.repo_name }}
+          BRANCH: ${{ inputs.branch }}
+          APP_ID: ${{ inputs.app_id }}
+          WF_NAME: ${{ inputs.workflow_name }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, sys, time, urllib.request, urllib.error
+          from cryptography.hazmat.primitives import hashes, serialization
+          from cryptography.hazmat.primitives.asymmetric.ec import ECDSA
+          from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+          def b64u(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+          p8 = base64.b64decode(os.environ["ASC_P8_B64"])
+          key = serialization.load_pem_private_key(p8, password=None)
+          def token():
+              now = int(time.time())
+              hdr = b64u(json.dumps({"alg":"ES256","kid":os.environ["ASC_KEY_ID"],"typ":"JWT"}).encode())
+              pay = b64u(json.dumps({"iss":os.environ["ASC_ISSUER"],"iat":now,"exp":now+1100,"aud":"appstoreconnect-v1"}).encode())
+              der = key.sign(f"{hdr}.{pay}".encode(), ECDSA(hashes.SHA256()))
+              r,s = decode_dss_signature(der)
+              return f"{hdr}.{pay}.{b64u(r.to_bytes(32,'big')+s.to_bytes(32,'big'))}"
+          def call(method, path, body=None):
+              data = json.dumps(body).encode() if body is not None else None
+              req = urllib.request.Request("https://api.appstoreconnect.apple.com"+path,
+                  data=data, method=method,
+                  headers={"Authorization":"Bearer "+token(),"Content-Type":"application/json"})
+              try:
+                  r = urllib.request.urlopen(req)
+                  raw = r.read()
+                  return r.status, (json.loads(raw) if raw.strip() else {})
+              except urllib.error.HTTPError as e:
+                  raw = e.read()
+                  try: detail = json.loads(raw)
+                  except Exception: detail = raw[:400]
+                  return e.code, detail
+
+          op = os.environ["XC_OP"]; reponame = os.environ["REPO_NAME"]
+          branch = os.environ["BRANCH"]; appid = os.environ["APP_ID"]
+          wfname = os.environ["WF_NAME"]
+
+          def provider():
+              st, d = call("GET", "/v1/scmProviders")
+              for p in d.get("data",[]):
+                  if "github" in (p["attributes"].get("url") or ""): return p["id"]
+              return d["data"][0]["id"] if d.get("data") else None
+
+          def find_repo():
+              st, d = call("GET", "/v1/scmRepositories?limit=100")
+              for r in d.get("data",[]):
+                  a = r["attributes"]
+                  if a.get("repositoryName") == reponame.split("/")[-1] and a.get("ownerName") == reponame.split("/")[0]:
+                      return r["id"]
+              return None
+
+          def register_repo():
+              rid = find_repo()
+              if rid: print("repo already registered:", rid); return rid
+              owner, name = reponame.split("/")
+              body = {"data":{"type":"scmRepositories","attributes":{
+                  "httpCloneUrl": f"https://github.com/{reponame}.git",
+                  "sshCloneUrl": f"git@github.com:{reponame}.git",
+                  "ownerName": owner, "repositoryName": name},
+                  "relationships":{"scmProvider":{"data":{"type":"scmProviders","id":provider()}}}}}
+              st, d = call("POST", "/v1/scmRepositories", body)
+              print("register-repo ->", st, json.dumps(d)[:500])
+              return (d.get("data") or {}).get("id")
+
+          def find_product():
+              st, d = call("GET", "/v1/ciProducts?limit=50")
+              for p in d.get("data",[]):
+                  rel = p.get("relationships",{}).get("app",{}).get("data",{})
+                  if rel.get("id") == appid: return p["id"]
+              return None
+
+          def create_product(rid):
+              pid = find_product()
+              if pid: print("product exists:", pid); return pid
+              body = {"data":{"type":"ciProducts","attributes":{
+                  "name":"Blount Phone","productType":"APP"},
+                  "relationships":{"app":{"data":{"type":"apps","id":appid}},
+                    "primaryRepositories":{"data":[{"type":"scmRepositories","id":rid}]},
+                    "additionalRepositories":{"data":[]}}}}
+              st, d = call("POST", "/v1/ciProducts", body)
+              print("create-product ->", st, json.dumps(d)[:500])
+              return (d.get("data") or {}).get("id")
+
+          def find_workflow():
+              st, d = call("GET", "/v1/ciWorkflows?limit=50")
+              for w in d.get("data",[]):
+                  if w["attributes"].get("name") == wfname: return w["id"]
+              return None
+
+          def create_workflow(pid, rid):
+              wid = find_workflow()
+              if wid: print("workflow exists:", wid); return wid
+              body = {"data":{"type":"ciWorkflows","attributes":{
+                  "name": wfname,
+                  "description": "GHA-dispatched Xcode Cloud build of Blount Phone (rebrand+shim via ci_post_clone)",
+                  "isEnabled": True, "isLockedForEditing": False, "clean": True,
+                  "containerFilePath": "LinphoneApp.xcodeproj",
+                  "actions": [{"actionType":"BUILD","destination":"TESTFLIGHT_INTERNAL",
+                               "scheme":"Linphone","platform":"IOS",
+                               "isRequiredToPass": True,
+                               "testConfiguration":{"kind":"USE_SCHEME_SETTINGS"}}],
+                  "manualBranchStartCondition": {
+                      "source": {"branchPatterns":[{"pattern": branch, "isPrefix": False}]},
+                      "filesAndFoldersRule": {}}},
+                  "relationships":{
+                      "product":{"data":{"type":"ciProducts","id":pid}},
+                      "repository":{"data":{"type":"scmRepositories","id":rid}}}}}
+              st, d = call("POST", "/v1/ciWorkflows", body)
+              print("create-workflow ->", st, json.dumps(d)[:800])
+              return (d.get("data") or {}).get("id")
+
+          def branch_ref(rid):
+              st, d = call("GET", f"/v1/scmRepositories/{rid}/gitReferences?filter[kind]=BRANCH&limit=100")
+              want = "refs/heads/" + branch
+              for g in d.get("data",[]):
+                  if g["attributes"].get("canonicalName") == want or g["attributes"].get("name") == branch:
+                      return g["id"]
+              print("branch ref not found; refs:", [g["attributes"].get("name") for g in d.get("data",[])][:20])
+              return None
+
+          def start_run(wid, rid):
+              g = branch_ref(rid)
+              if not g: return None
+              body = {"data":{"type":"ciBuildRuns","relationships":{
+                  "workflow":{"data":{"type":"ciWorkflows","id":wid}},
+                  "sourceBranchOrTag":{"data":{"type":"scmGitReferences","id":g}}}}}
+              st, d = call("POST", "/v1/ciBuildRuns", body)
+              print("start-run ->", st, json.dumps(d)[:600])
+              return (d.get("data") or {}).get("id")
+
+          def probe():
+              for label, path in [("providers","/v1/scmProviders"),
+                                  ("repos","/v1/scmRepositories?limit=20"),
+                                  ("products","/v1/ciProducts?limit=20"),
+                                  ("workflows","/v1/ciWorkflows?limit=20"),
+                                  ("runs","/v1/ciBuildRuns?limit=5")]:
+                  st, d = call("GET", path)
+                  items = d.get("data") or []
+                  print(f"{label}: {len(items)}")
+                  for it in items[:8]:
+                      a = it.get("attributes",{})
+                      print("  ", it["id"], {k:a[k] for k in list(a)[:6]})
+
+          def poll():
+              st, d = call("GET", "/v1/ciBuildRuns?limit=5&sort=-createdDate")
+              for r in d.get("data",[]):
+                  a = r["attributes"]
+                  print("run", r["id"], a.get("number"), a.get("executionProgress"), a.get("completionStatus"), a.get("createdDate"))
+              if d.get("data"):
+                  rid = d["data"][0]["id"]
+                  st, b = call("GET", f"/v1/ciBuildRuns/{rid}/builds")
+                  for x in b.get("data",[]):
+                      print("  build", x["id"], x["attributes"].get("version"), x["attributes"].get("processingState"))
+
+          if op == "probe": probe()
+          elif op == "register-repo": register_repo()
+          elif op == "create-product":
+              rid = find_repo()
+              if not rid: rid = register_repo()
+              if rid: create_product(rid)
+          elif op == "create-workflow":
+              rid = find_repo(); pid = find_product()
+              if rid and pid: create_workflow(pid, rid)
+              else: print("missing", "repo" if not rid else "", "product" if not pid else "")
+          elif op == "chain":
+              rid = register_repo()
+              if rid:
+                  pid = create_product(rid)
+                  if pid: create_workflow(pid, rid)
+          elif op == "run":
+              rid = find_repo(); wid = find_workflow()
+              if wid and rid: start_run(wid, rid)
+              else: print("missing", "workflow" if not wid else "", "repo" if not rid else "")
+          elif op == "poll": poll()
+          PY
