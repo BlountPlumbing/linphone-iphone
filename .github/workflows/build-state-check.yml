@@ -1,0 +1,67 @@
+name: Build state check (ASC)
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: Bundle ID to check
+        required: true
+        default: net.blount.phone
+      build_number:
+        description: cfBundleVersion to look for (blank = report latest 10)
+        required: false
+        default: "55"
+jobs:
+  check-build-state:
+    name: Query ASC for uploaded build processing state
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install cryptography
+        run: pip install cryptography
+      - name: Mint JWT + query builds
+        env:
+          ASC_KEY_ID: ${{ secrets.APPSTORE_CONNECT_KEY_ID }}
+          ASC_ISSUER: ${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}
+          ASC_P8_B64: ${{ secrets.APPSTORE_CONNECT_PRIVATE_KEY }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.request, urllib.error
+          from cryptography.hazmat.primitives import hashes, serialization
+          from cryptography.hazmat.primitives.asymmetric.ec import ECDSA
+          from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+          def b64u(b): return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+          p8 = base64.b64decode(os.environ["ASC_P8_B64"])
+          key = serialization.load_pem_private_key(p8, password=None)
+          now = int(time.time())
+          hdr = b64u(json.dumps({"alg":"ES256","kid":os.environ["ASC_KEY_ID"],"typ":"JWT"}).encode())
+          pay = b64u(json.dumps({"iss":os.environ["ASC_ISSUER"],"iat":now,"exp":now+1200,"aud":"appstoreconnect-v1"}).encode())
+          der = key.sign(f"{hdr}.{pay}".encode(), ECDSA(hashes.SHA256()))
+          r,s = decode_dss_signature(der)
+          tok = f"{hdr}.{pay}.{b64u(r.to_bytes(32,'big')+s.to_bytes(32,'big'))}"
+
+          def get(path):
+              req = urllib.request.Request("https://api.appstoreconnect.apple.com"+path,
+                  headers={"Authorization":f"Bearer {tok}"})
+              return json.loads(urllib.request.urlopen(req).read())
+
+          bid = os.environ["BUNDLE_ID"]
+          apps = get(f"/v1/apps?filter[bundleId]={bid}&fields[apps]=bundleId,name")
+          if not apps.get("data"):
+              print(f"NO APP for {bid}"); raise SystemExit(1)
+          app = apps["data"][0]
+          print(f"APP {app['id']} {app['attributes'].get('name')} ({bid})")
+          builds = get(f"/v1/builds?filter[app]={app['id']}&sort=-uploadedDate&limit=10&fields[builds]=version,cfBundleVersion,processingState,uploadedDate,expired")
+          want = os.environ.get("BUILD_NUMBER","").strip()
+          found = False
+          for b in builds.get("data",[]):
+              a = b["attributes"]
+              mark = " <== WANTED" if want and a.get("cfBundleVersion")==want else ""
+              if mark: found = True
+              print(f"build {a.get('cfBundleVersion')} v{a.get('version')} state={a.get('processingState')} expired={a.get('expired')} uploaded={a.get('uploadedDate')}{mark}")
+          if want and not found: print(f"build {want} NOT in latest 10")
+          PY
