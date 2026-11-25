@@ -1,105 +1,117 @@
 #!/usr/bin/env python3
 """fix_signing.py — correct manual-signing config in the rebranded pbxproj.
 
-Replaces rebrand.sh's retired perl block transform, which matched config
-blocks by text order and landed Manual/specifier keys on the wrong targets'
-wrong configs (Release stayed Automatic -> "conflicting provisioning
-settings" archive failure; the original workaround — CODE_SIGNING_ALLOWED=NO
-— shipped entitlements-stripped binaries that crash every launch).
+Line-wise editing only: replaces or inserts whole lines inside the
+buildSettings region of each app target's Release XCBuildConfiguration.
+Never restructures the file — the v1 object-splice corrupted the project
+(run 45575337718: "project is damaged ... parse error").
 
-Parses the object graph properly: PBXNativeTarget -> buildConfigurationList
--> XCBuildConfiguration(Release) for the four app/extension bundle ids, and
-writes CODE_SIGN_STYLE=Manual, CODE_SIGN_IDENTITY="Apple Distribution",
-PROVISIONING_PROFILE_SPECIFIER="BlountDist <bundle>". Idempotent.
+Sets CODE_SIGN_STYLE=Manual, CODE_SIGN_IDENTITY="Apple Distribution",
+PROVISIONING_PROFILE_SPECIFIER="BlountDist <bundle>" for the four
+app/extension bundle ids; strips legacy PROVISIONING_PROFILE uuid lines.
+Idempotent.
 """
 import re, sys
 
 path = sys.argv[1] if len(sys.argv) > 1 else 'LinphoneApp.xcodeproj/project.pbxproj'
-src = open(path).read()
+lines = open(path).readlines()
 
-BUNDLES = [
+BUNDLES = {
     'net.blount.phone',
     'net.blount.phone.msgNotificationService',
     'net.blount.phone.linphoneExtension',
     'net.blount.phone.intentsExtension',
-]
+}
 
-# --- parse objects: HEXID /* comment */ = { ... }; -------------------------
-obj_re = re.compile(r'([0-9A-F]{24}) /\* ([^*]+) \*/ = \{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\};', re.S)
+# --- pass 1: object map — id -> (start, end, isa) --------------------------
+obj_start = re.compile(r'^\t\t([0-9A-F]{24}) /\* (.+?) \*/ = \{$')
 objects = {}
-for m in obj_re.finditer(src):
-    objects[m.group(1)] = {'comment': m.group(2), 'body': m.group(3), 'span': m.span()}
+cur = None
+for i, ln in enumerate(lines):
+    m = obj_start.match(ln)
+    if m:
+        cur = m.group(1)
+        objects[cur] = {'start': i, 'end': None, 'comment': m.group(2)}
+    elif cur and ln.rstrip() == '\t\t};':
+        objects[cur]['end'] = i
+        cur = None
 
-def field(body, key):
-    m = re.search(re.escape(key) + r' = ([^;]+);', body)
-    return m.group(1).strip() if m else None
+def obj_lines(oid):
+    o = objects[oid]
+    return lines[o['start']:o['end']+1]
 
-# --- XCBuildConfiguration objects: map id -> (name, body) ------------------
-configs = {}
-for oid, o in objects.items():
-    if 'isa = XCBuildConfiguration' in o['body']:
-        configs[oid] = o
+def field(oid, key):
+    for ln in obj_lines(oid):
+        m = re.match(r'\s*' + re.escape(key) + r' = ([^;]+);', ln)
+        if m:
+            return m.group(1).strip()
+    return None
 
-# --- XCConfigurationList -> {listid: [configids]} --------------------------
-conflists = {}
-for oid, o in objects.items():
-    if 'isa = XCConfigurationList' in o['body']:
-        ids = re.findall(r'([0-9A-F]{24}) /\* (?:Release|Debug) \*/', o['body'])
-        conflists[oid] = ids
-
-# --- PBXNativeTarget -> (name, conflist id) --------------------------------
-targets = []
-for oid, o in objects.items():
-    if 'isa = PBXNativeTarget' in o['body']:
-        cl = field(o['body'], 'buildConfigurationList')
-        clid = cl.split()[0] if cl else None
-        targets.append((oid, o['comment'], clid))
-
-def rewrite_config(body, bundle):
-    def upsert(b, key, val):
-        if re.search(re.escape(key) + r'\s*=', b):
-            return re.sub(re.escape(key) + r' = [^;]+;', f'{key} = {val};', b)
-        # append at end of buildSettings body, matching tab indent
-        return b.rstrip() + f'\n\t\t\t\t{key} = {val};\n\t\t\t'
-    body = upsert(body, 'CODE_SIGN_STYLE', 'Manual')
-    body = upsert(body, 'CODE_SIGN_IDENTITY', '"Apple Distribution"')
-    body = upsert(body, 'CODE_SIGN_IDENTITY[sdk=iphoneos*]', '"Apple Distribution"')
-    body = upsert(body, 'PROVISIONING_PROFILE_SPECIFIER', f'"BlountDist {bundle}"')
-    # strip legacy uuid key that forces automatic-style conflict
-    body = re.sub(r'\n\t\t\t+PROVISIONING_PROFILE = "[0-9a-fA-F-]+";', '', body)
-    return body
-
+# --- pass 2: targets -> configuration list -> Release config ids -----------
 edits = 0
-out = src
-spans = []
-for oid, name, clid in targets:
-    if not clid or clid not in conflists:
+for oid, o in objects.items():
+    body = ''.join(obj_lines(oid))
+    if 'isa = PBXNativeTarget' not in body:
         continue
-    for cid in conflists[clid]:
-        cfg = configs.get(cid)
-        if not cfg or 'name = Release' not in cfg['body']:
+    cl = field(oid, 'buildConfigurationList')
+    if not cl:
+        continue
+    clid = cl.split()[0]
+    if clid not in objects:
+        continue
+    # config ids inside the configuration list object
+    for ln in obj_lines(clid):
+        cm = re.match(r'\s*([0-9A-F]{24}) /\* Release \*/,?', ln)
+        if not cm:
             continue
-        b = cfg['body']
-        m = re.search(r'PRODUCT_BUNDLE_IDENTIFIER = (net\.blount\.phone(?:\.[A-Za-z]+)?);', b)
-        if not m or m.group(1) not in BUNDLES:
+        cid = cm.group(1)
+        if cid not in objects:
             continue
-        nb = rewrite_config(b, m.group(1))
-        if nb != b:
-            spans.append((cfg['span'], nb))
-            edits += 1
+        cbody = ''.join(obj_lines(cid))
+        bm = re.search(r'PRODUCT_BUNDLE_IDENTIFIER = (net\.blount\.phone(?:\.[A-Za-z]+)?);', cbody)
+        if not bm or bm.group(1) not in BUNDLES:
+            continue
+        # --- edit this config object line-wise ---
+        bundle = bm.group(1)
+        o0, o1 = objects[cid]['start'], objects[cid]['end']
+        seg = lines[o0:o1+1]
+        want = {
+            'CODE_SIGN_STYLE': 'CODE_SIGN_STYLE = Manual;',
+            'CODE_SIGN_IDENTITY': 'CODE_SIGN_IDENTITY = "Apple Distribution";',
+            'CODE_SIGN_IDENTITY[sdk=iphoneos*]': 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = "Apple Distribution";',
+            'PROVISIONING_PROFILE_SPECIFIER': f'PROVISIONING_PROFILE_SPECIFIER = "BlountDist {bundle}";',
+        }
+        seen = set()
+        # buildSettings region bounds within seg
+        bs_start = bs_end = None
+        for j, ln in enumerate(seg):
+            if 'buildSettings = {' in ln:
+                bs_start = j
+            elif bs_start is not None and bs_end is None and re.match(r'^\t\t\t\};', ln):
+                bs_end = j
+        if bs_start is None or bs_end is None:
+            continue
+        out_seg = seg[:]
+        for j in range(bs_start+1, bs_end):
+            ln = out_seg[j]
+            km = re.match(r'^(\t\t\t\t)([A-Z_]+(?:\[sdk=[^\]]+\])?) = ', ln)
+            if km and km.group(2) in want:
+                key = km.group(2)
+                newline = f'{km.group(1)}{want[key]}\n'
+                if ln != newline:
+                    out_seg[j] = newline
+                    edits += 1
+                seen.add(key)
+            if re.match(r'^\t\t\t\tPROVISIONING_PROFILE = "[0-9a-fA-F-]+";', ln):
+                out_seg[j] = ''
+                edits += 1
+        missing = [k for k in want if k not in seen]
+        if missing:
+            indent = '\t\t\t\t'
+            ins = ''.join(f'{indent}{want[k]}\n' for k in missing)
+            out_seg[bs_end] = ins + out_seg[bs_end]
+            edits += len(missing)
+        lines[o0:o1+1] = out_seg
 
-# apply edits from the end backwards so spans stay valid
-for (s, e), nb in sorted(spans, reverse=True):
-    header = out[s:e]
-    # replace only the body portion inside the object text
-    objtext = out[s:e]
-    # body is everything after '= {' up to before final '}'
-    pre = objtext[:objtext.index('{')+1]
-    post = objtext[objtext.rindex('}'):]
-    out = out[:s] + pre + nb + post + out[e:]
-
-open(path, 'w').write(out)
-print(f'fix_signing: {edits} Release config(s) rewritten')
-if edits < 4:
-    print(f'WARNING: expected 4 app-target Release configs, rewrote {edits}')
-    sys.exit(1)
+open(path, 'w').write(''.join(lines))
+print(f'fix_signing: applied {edits} line edits')
