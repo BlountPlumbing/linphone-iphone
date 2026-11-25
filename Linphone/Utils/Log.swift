@@ -44,7 +44,15 @@ class Log: LoggingServiceDelegate {
 
 	private init() {
 		service.domain = Bundle.main.bundleIdentifier!
-		Core.setLogCollectionPath(path: Factory.Instance.getDataDir(context: UnsafeMutablePointer<Int8>(mutating: (self.appGroupName as NSString).utf8String)))
+		// linphone's getDataPath strlen's the app-group container path — when the
+		// container isn't materialized yet (transient on first launch after
+		// reinstall) the returned char* is NULL and the SDK segfaults inside
+		// Log.init, before any code of ours runs. SIGSEGV can't be caught, so
+		// gate the call on the same lookup the SDK does: nil container = skip
+		// file log-collection for this launch; it resolves on the next launch.
+		if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName) != nil {
+			Core.setLogCollectionPath(path: Factory.Instance.getDataDir(context: UnsafeMutablePointer<Int8>(mutating: (self.appGroupName as NSString).utf8String)))
+		}
 		Core.enableLogCollection(state: LogCollectionState.Enabled)
 		setMask()
 		LoggingService.Instance.addDelegate(delegate: self)
