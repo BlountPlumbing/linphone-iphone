@@ -162,13 +162,14 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}" \
             -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8 \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGNING_ALLOWED=NO \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             PBX_SHIM_URL="http://192.168.200.158:8777" \
             PBX_SHIM_TOKEN="$PBX_SHIM_TOKEN"
 
-      # Archive is unsigned; the export re-signs all 4 targets with the
-      # BlountDist profiles + Apple Distribution cert (installed above).
+      # Archive IS signed (entitlements only enter the binary via codesign —
+      # an unsigned archive exports with stripped entitlements: the app-group
+      # lookup then returns nil at runtime and the linphone SDK segfaults at
+      # launch). Export re-signs for distribution, preserving them.
       - name: Export IPA (app-store-connect method → TestFlight)
         run: |
           cat > exportOptions.plist <<'EOF'
@@ -196,6 +197,20 @@ jobs:
             -authenticationKeyID "${{ secrets.APPSTORE_CONNECT_KEY_ID }}" \
             -authenticationKeyIssuerID "${{ secrets.APPSTORE_CONNECT_ISSUER_ID }}" \
             -authenticationKeyPath ~/.private_keys/AuthKey_${{ secrets.APPSTORE_CONNECT_KEY_ID }}.p8
+
+      # Entitlements gate — the 2026-11-25 root cause: archive built with
+      # CODE_SIGNING_ALLOWED=NO shipped binaries whose signature carried only
+      # baseline entitlements (no application-groups, no aps-environment),
+      # crashing every launch inside linphone SDK path resolution. Verify the
+      # exported IPA actually carries them; never ship a stripped binary.
+      - name: Verify entitlements in exported IPA
+        run: |
+          mkdir -p verify && cd verify && unzip -q ../build/ipa/*.ipa
+          ENT=$(codesign -d --entitlements :- "Payload/LinphoneApp.app" 2>&1)
+          echo "$ENT"
+          echo "$ENT" | grep -q "com.apple.security.application-groups" || { echo "FATAL: application-groups entitlement missing from signed binary — archive-time signing broken"; exit 1; }
+          echo "$ENT" | grep -q "group.net.blount.phone" || { echo "FATAL: group.net.blount.phone missing from application-groups"; exit 1; }
+          echo "entitlements gate: PASS"
 
       - uses: actions/upload-artifact@v4
         with:
