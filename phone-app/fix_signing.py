@@ -78,7 +78,7 @@ for oid, o in objects.items():
         want = {
             'CODE_SIGN_STYLE': 'CODE_SIGN_STYLE = Manual;',
             'CODE_SIGN_IDENTITY': 'CODE_SIGN_IDENTITY = "Apple Distribution";',
-            'CODE_SIGN_IDENTITY[sdk=iphoneos*]': 'CODE_SIGN_IDENTITY[sdk=iphoneos*] = "Apple Distribution";',
+            'CODE_SIGN_IDENTITY[sdk=iphoneos*]': '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";',
             'PROVISIONING_PROFILE_SPECIFIER': f'PROVISIONING_PROFILE_SPECIFIER = "BlountDist {bundle}";',
         }
         seen = set()
@@ -94,7 +94,7 @@ for oid, o in objects.items():
         out_seg = seg[:]
         for j in range(bs_start+1, bs_end):
             ln = out_seg[j]
-            km = re.match(r'^(\t\t\t\t)([A-Z_]+(?:\[sdk=[^\]]+\])?) = ', ln)
+            km = re.match(r'^(\t\t\t\t)"?([A-Z_]+(?:\[sdk=[^\]]+\])?)"? = ', ln)
             if km and km.group(2) in want:
                 key = km.group(2)
                 newline = f'{km.group(1)}{want[key]}\n'
