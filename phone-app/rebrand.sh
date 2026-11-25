@@ -57,31 +57,16 @@ ed "$PBXPROJ" 's/INFOPLIST_KEY_CFBundleDisplayName = Linphone;/INFOPLIST_KEY_CFB
 ed "$PBXPROJ" 's/^[ \t]*"USE_CRASHLYTICS=1",\n//mg'
 ed "$PBXPROJ" 's/ -DUSE_CRASHLYTICS//g'
 
-# Manual App Store signing on Release configs of the 4 app targets ONLY.
-# Team has zero registered devices -> automatic development profile
-# resolution fails; automatic style also conflicts with any explicit
-# distribution identity. So: CODE_SIGN_STYLE=Manual + Apple Distribution +
-# per-target "BlountDist <bundle-id>" profile specifiers (profiles are
-# created via ASC API and installed by CI). Non-app Release blocks (test
-# targets) are normalized back to Apple Development. SPM package targets
-# live outside this file and are untouched. Idempotent.
-perl -0777 -pi -e '
-s{(buildSettings = \{\n)(.*?)(\n\t+\};\n\t+name = Release;)}{
-  my ($h,$b,$t)=($1,$2,$3);
-  my $bid = $b =~ /PRODUCT_BUNDLE_IDENTIFIER = (net\.blount\.phone(?:\.[A-Za-z]+)?);/ ? $1 : undef;
-  if ($bid) {
-    $b =~ s/CODE_SIGN_STYLE = \w+;/CODE_SIGN_STYLE = Manual;/
-      or $b .= "\n\t\t\t\tCODE_SIGN_STYLE = Manual;";
-    $b =~ s/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "Apple Distribution";/
-      or $b .= "\n\t\t\t\tCODE_SIGN_IDENTITY = \"Apple Distribution\";";
-    $b =~ s/PROVISIONING_PROFILE_SPECIFIER = "[^"]*";/PROVISIONING_PROFILE_SPECIFIER = "BlountDist $bid";/
-      or $b .= "\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"BlountDist $bid\";";
-  } else {
-    $b =~ s/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "Apple Development";/;
-  }
-  "$h$b$t";
-}gse;
-' "$PBXPROJ"
+# Manual App Store signing on Release configs of the 4 app targets, done
+# RIGHT: the retired perl transform matched config blocks by text order and
+# landed Manual/specifier keys on the wrong blocks (Release stayed Automatic
+# -> "conflicting provisioning settings" archive failure; the original
+# workaround CODE_SIGNING_ALLOWED=NO shipped entitlements-stripped binaries
+# that crash every launch — the 2026-11-25 root cause). fix_signing.py parses
+# the pbxproj object graph (target -> configurationList -> Release config)
+# and writes Manual + Apple Distribution + per-target BlountDist specifiers
+# into the correct objects. Idempotent.
+python3 "$ROOT/phone-app/fix_signing.py" "$PBXPROJ"
 
 # SPM: repoint gitlab -> github mirror; pin BOTH linphone-sdk refs to exactVersion
 ed "$PBXPROJ" 's|https://gitlab\.linphone\.org/BC/public/linphone-sdk-swift-ios\.git|https://github.com/BelledonneCommunications/linphone-sdk-swift-ios.git|g'
