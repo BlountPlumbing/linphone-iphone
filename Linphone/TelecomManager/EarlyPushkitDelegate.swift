@@ -32,7 +32,12 @@ class EarlyPushkitDelegate: NSObject, PKPushRegistryDelegate, CXProviderDelegate
 		action.fail()
 		provider.reportCall(with: action.callUUID, endedAt: .init(), reason: .unanswered)
 		activeCalls = activeCalls.filter { $0.value.uuid != action.callUUID }
-		postMissedCallNotification(trigger: nil)
+		// Config may have arrived between the push and the tap — in that case the
+		// SDK path owns the real call and this phantom must not also post a fake
+		// missed-call notification.
+		if AppServices.configIfAvailable == nil {
+			postMissedCallNotification(trigger: nil)
+		}
 	}
 
 	func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
@@ -42,7 +47,13 @@ class EarlyPushkitDelegate: NSObject, PKPushRegistryDelegate, CXProviderDelegate
 
 	func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
 		PushShimReporter.mark("push.m0.received")
-		Log.info("[EarlyPushkitDelegate] Received incoming push while core is not ready, reporting call to CallKit")
+		let configReady = AppServices.configIfAvailable != nil
+		if !configReady {
+			Log.info("[EarlyPushkitDelegate] Received incoming push while core is not ready, reporting call to CallKit")
+		} else {
+			PushShimReporter.mark("push.m0.phantom")
+			Log.info("[EarlyPushkitDelegate] Received incoming push while config IS available — reporting to CallKit (required) but the SDK path owns the real call; ending this phantom quietly")
+		}
 		let signature = String(describing: payload.dictionaryPayload as NSDictionary)
 
 		if let existing = activeCalls[signature] {
@@ -66,6 +77,19 @@ class EarlyPushkitDelegate: NSObject, PKPushRegistryDelegate, CXProviderDelegate
 			} else {
 				PushShimReporter.mark("push.m2.callkit.ok")
 			}
+			if configReady {
+				// Every voip push must be reported to CallKit or iOS kills the
+				// app — but this report is a phantom duplicate of the SDK's real
+				// call. End it the moment the report lands, quietly: no fake 4s
+				// ring, no fake missed-call notification, no eatable answer.
+				provider.reportCall(with: uuid, endedAt: .init(), reason: .failed)
+			}
+		}
+
+		if configReady {
+			activeCalls.removeValue(forKey: signature)
+			completion()
+			return
 		}
 
 		postMissedCallNotification(trigger: UNTimeIntervalNotificationTrigger(timeInterval: 4, repeats: false))
