@@ -105,6 +105,21 @@ perl -0777 -pi -e 's|<key>com\.apple\.security\.application-groups</key>\s*\n\t*
 perl -0777 -pi -e 's|(<key>(?:com\.apple\.developer\.)?aps-environment</key>\s*\n\s*<string>)[^<]*(</string>)|$1'"$APS_ENV"'$2|g' \
 	"$ROOT/Linphone/Linphone.entitlements"
 
+# --- 3b. strip Apple-restricted NSE filtering entitlement -------------------
+# com.apple.developer.usernotifications.filtering requires Apple approval the
+# Blount team does not have — archive signing hard-fails on it (run 45587785353:
+# "requires approval from Apple to include in a profile"). Apple's own guidance:
+# remove until approved. Cost: NSE cannot suppress/hide notifications (chat-read
+# sync polish); content modification still works. Re-add on approval.
+python3 - "$ROOT/msgNotificationService/msgNotificationService.entitlements" <<'PYSTRIP'
+import plistlib, sys
+p = sys.argv[1]
+d = plistlib.load(open(p, 'rb'))
+if d.pop('com.apple.developer.usernotifications.filtering', None) is not None:
+    plistlib.dump(d, open(p, 'wb'))
+    print('rebrand: stripped unapproved usernotifications.filtering from NSE entitlements')
+PYSTRIP
+
 # --- 4. plists ----------------------------------------------------------------
 ed "$ROOT/Linphone/Info.plist" 's|\borg\.linphone\.phone\b|net.blount.phone|g'   # CFBundleURLName x12
 ed "$ROOT/Linphone/Info.plist" 's|<string>org\.linphone</string>|<string>net.blount</string>|g' # org.linphone:// URL scheme
