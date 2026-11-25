@@ -357,7 +357,7 @@
 "help_about_contribute_translations_title" = "Contribute on Linphone translation";
 "help_about_open_source_licenses_subtitle" = "© Belledonne Communications 2010-2024";
 "help_about_open_source_licenses_title" = "GNU General Public License v3.0";
-"help_about_privacy_policy_subtitle" = "What information Linphone collects and uses";
+"help_about_privacy_policy_subtitle" = "What information Blount Phone collects and uses";
 "help_about_privacy_policy_title" = "Privacy policy";
 "help_about_title" = "About Linphone";
 "help_about_user_guide_title" = "Linphone user guide";
@@ -631,7 +631,7 @@
 "website_download_url" = "https://linphone.org/linphone-softphone";
 "website_open_source_licences_usage_url" = "https://wiki.linphone.org/xwiki/wiki/public/view/Linphone/Third%20party%20components%20/";
 "website_user_guide_url" = "https://linphone.org/en/docs/";
-"website_privacy_policy_url" = "https://linphone.org/en/privacy-policy";
+"website_privacy_policy_url" = "https://blounts.plumbing/privacy";
 "website_terms_and_conditions_url" = "https://www.linphone.org/en/terms-of-use";
 "website_translate_weblate_url" = "https://weblate.linphone.org/";
 "welcome_carousel_skip" = "Skip";

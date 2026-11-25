@@ -48,7 +48,7 @@ class HelpViewModel: ObservableObject {
 			sdkGitBranch = String(sdkGitBranch.dropFirst("remotes/origin/".count))
 		}
 		
-		self.appVersion = appGitTag
+		self.appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? appGitTag
 		self.version = appGitTag + "-" + appGitVersion + "\n(\(appGitBranch))"
 		
 		self.sdkVersion = sdkGitVersion + "\n(\(sdkGitBranch))"
